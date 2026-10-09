@@ -8,7 +8,8 @@ import { exerciseRecords, formatSet, isCountable, oneRepMax } from "../lib/worko
 import { REGION_LABEL, musclesFor } from "../lib/muscles";
 import { Card, PageHeader, Screen, SectionTitle } from "../components/ui";
 import { LineChart } from "../components/Charts";
-import { ExerciseAnimation } from "../components/ExerciseAnimation";
+import { ExerciseDemo } from "../components/ExerciseDemo";
+import { mediaFor } from "../lib/exerciseMedia";
 import { MuscleMap } from "../components/MuscleMap";
 import type { WorkoutSet } from "../types";
 
@@ -77,6 +78,7 @@ export function ExerciseProgress({ exerciseId, onClose, overlay }: { exerciseId:
   }
 
   const targets = musclesFor(exercise);
+  const steps = mediaFor(exercise)?.steps ?? [];
   const w = (kg: number) => `${fmt(show(kg), 1)} ${unit}`;
   const history = [...sessions].reverse();
   const visible = showAll ? history : history.slice(0, 5);
@@ -87,9 +89,7 @@ export function ExerciseProgress({ exerciseId, onClose, overlay }: { exerciseId:
       <div className="px-3 pb-12">
         {/* How it's done + what it works */}
         <Card className="p-3">
-          <div className="overflow-hidden rounded-xl bg-bg/60">
-            <ExerciseAnimation exercise={exercise} className="w-full" />
-          </div>
+          <ExerciseDemo exercise={exercise} />
           <div className="mt-3 flex items-center gap-3">
             <div className="w-[46%] shrink-0">
               <MuscleMap targets={targets} />
@@ -112,6 +112,23 @@ export function ExerciseProgress({ exerciseId, onClose, overlay }: { exerciseId:
             </div>
           </div>
         </Card>
+
+        {/* How to */}
+        {steps.length > 0 && (
+          <>
+            <SectionTitle>How to do it</SectionTitle>
+            <Card>
+              <ol className="space-y-2.5">
+                {steps.map((step, i) => (
+                  <li key={i} className="flex gap-3 text-sm leading-relaxed">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surf3 text-[11px] font-semibold text-tx2">{i + 1}</span>
+                    <span className="text-tx2">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          </>
+        )}
 
         {/* Progress */}
         <SectionTitle>Progress</SectionTitle>

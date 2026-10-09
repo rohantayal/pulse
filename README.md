@@ -72,7 +72,11 @@ Re-run any time from Settings → Set up my plan again.
   the main muscle by name. The ⓘ next to an exercise opens its page: an animated sketch of the movement,
   front/back muscle map, a progress chart (heaviest / est. 1RM / volume, or reps for body-weight moves),
   session history, and personal records (best set, heaviest weight, best est. 1RM, best set volume, most
-  reps in a session, best session volume). The animations are simple stick-figure sketches, not videos.
+  reps in a session, best session volume).
+- Exercise photos (start/end positions, shown alternating like a GIF) and step-by-step instructions come
+  from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain), resized to WebP and
+  bundled in `public/exercise-img` so they work offline (~2 MB). Custom exercises and burpees fall back to
+  the muscle sketch and a simple animated stick figure.
 
 **Nutrition**
 - Log a meal by typing what you ate: `2 roti, 1 bowl dal, 150g paneer, banana`. Each part is matched
