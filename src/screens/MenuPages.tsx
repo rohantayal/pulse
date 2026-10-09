@@ -6,13 +6,13 @@ import { useUi } from "../store/ui";
 import type { ExerciseGoals, NutritionGoals } from "../types";
 import { addDays, dayNum, dowShort, fromKey, longDate, monthShort, todayKey, weekDays, weekStart, formatDuration } from "../lib/date";
 import { fmt } from "../lib/format";
-import { macroCalories } from "../lib/nutrition";
+import { BAR_COLOR, DEFAULT_OVER_ALLOWANCE, GOOD_COLOR, calorieStatus, macroCalories, statusColor } from "../lib/nutrition";
 import { dayStats } from "../lib/day";
 import { exercisesVolume } from "../lib/workout";
 import { Button, Card, Field, NumberInput, PageHeader, ProgressBar, Screen, SectionTitle, inputCls } from "../components/ui";
 import { BarChart, LineChart } from "../components/Charts";
 
-const C = { carbs: "#199e70", protein: "#3987e5", fat: "#d95926", cal: "#3fb96b", steps: "#3fb96b", burn: "#d95926" };
+const C = { carbs: BAR_COLOR, protein: BAR_COLOR, fat: BAR_COLOR, cal: GOOD_COLOR, steps: "#3fb96b", burn: BAR_COLOR };
 
 // ---------------------------------------------------------------- Nutrition goals
 
@@ -46,6 +46,33 @@ export function NutritionGoalsPage() {
           <Field label="Daily calories">
             <NumberInput value={g.calories} onChange={(v) => setG({ ...g, calories: Math.max(0, Math.round(v ?? 0)) })} suffix="kcal" step="1" />
           </Field>
+          <div className="mt-4">
+            <Field
+              label="Over-goal allowance"
+              hint="A day stays green until you eat this many kcal more than your goal (plus exercise). Beyond that it turns red."
+            >
+              <NumberInput
+                value={g.overAllowance ?? DEFAULT_OVER_ALLOWANCE}
+                onChange={(v) => setG({ ...g, overAllowance: Math.max(0, Math.round(v ?? 0)) })}
+                suffix="kcal"
+                step="1"
+              />
+            </Field>
+            <div className="mt-2 flex gap-2">
+              {[0, 50, 100, 200].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setG({ ...g, overAllowance: n })}
+                  className={clsx(
+                    "flex-1 rounded-lg py-1.5 text-xs font-medium",
+                    (g.overAllowance ?? DEFAULT_OVER_ALLOWANCE) === n ? "bg-acc text-white" : "bg-surf2 text-tx2",
+                  )}
+                >
+                  {n === 0 ? "Strict" : `±${n}`}
+                </button>
+              ))}
+            </div>
+          </div>
         </Card>
         <Card>
           <div className="mb-3 flex items-center justify-between">
@@ -72,7 +99,6 @@ export function NutritionGoalsPage() {
               <div key={k} className="grid grid-cols-[1fr_7rem] items-center gap-3">
                 <div>
                   <div className="flex items-center gap-1.5 font-medium">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: C[k] }} />
                     {label}
                   </div>
                   <div className="text-xs text-tx2">
@@ -169,7 +195,20 @@ export function NutritionWeeklyPage() {
             <div className="text-sm font-semibold">Calories eaten</div>
             <div className="text-xs text-tx2">{logged.length}/7 days logged</div>
           </div>
-          <BarChart data={stats.map((x) => ({ key: x.d, label: dowShort(x.d), value: Math.round(x.s.food.calories) }))} goal={goals.calories} color={C.cal} unit="kcal" />
+          <BarChart
+            data={stats.map((x) => ({ key: x.d, label: dowShort(x.d), value: Math.round(x.s.food.calories) }))}
+            goal={goals.calories}
+            color={(i) => statusColor(calorieStatus(stats[i].s.food.calories, goals.calories + stats[i].s.exercise, goals.overAllowance))}
+            unit="kcal"
+          />
+          <div className="mt-1 flex justify-center gap-4 text-[11px] text-tx2">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-good" /> Within goal
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-bad" /> Over by more than {fmt(goals.overAllowance ?? DEFAULT_OVER_ALLOWANCE)} kcal
+            </span>
+          </div>
         </Card>
 
         <div className="mt-3 grid grid-cols-2 gap-3">
@@ -197,7 +236,6 @@ export function NutritionWeeklyPage() {
             <div key={k}>
               <div className="mb-1 flex justify-between text-sm">
                 <span className="flex items-center gap-1.5 font-medium">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: C[k] }} />
                   {label}
                 </span>
                 <span className="tabular-nums">

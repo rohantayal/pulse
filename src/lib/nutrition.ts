@@ -56,3 +56,30 @@ function round(n: number, dp: number) {
   const f = 10 ** dp;
   return Math.round(n * f) / f;
 }
+
+/** One colour for every progress bar; calories switch to green/red by status instead. */
+export const BAR_COLOR = "#3987e5";
+export const GOOD_COLOR = "#3fb96b";
+export const OVER_COLOR = "#e66767";
+export const DEFAULT_OVER_ALLOWANCE = 100;
+
+export type CalorieStatus = "good" | "over";
+
+/** Green while eaten ≤ budget + allowance, red beyond that. Budget = goal + exercise calories. */
+export function calorieStatus(eaten: number, budget: number, allowance = DEFAULT_OVER_ALLOWANCE): CalorieStatus {
+  return eaten - budget > allowance ? "over" : "good";
+}
+
+export function statusColor(s: CalorieStatus): string {
+  return s === "over" ? OVER_COLOR : GOOD_COLOR;
+}
+
+/** Share of a meal's calories from each macro (4/4/9 kcal per g), in %. Sums to 100 when non-empty. */
+export function macroSplit(m: Pick<Macros, "carbs" | "protein" | "fat">): { carbs: number; protein: number; fat: number } {
+  const c = m.carbs * 4;
+  const p = m.protein * 4;
+  const f = m.fat * 9;
+  const t = c + p + f;
+  if (t <= 0) return { carbs: 0, protein: 0, fat: 0 };
+  return { carbs: (c / t) * 100, protein: (p / t) * 100, fat: (f / t) * 100 };
+}

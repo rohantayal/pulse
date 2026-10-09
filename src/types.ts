@@ -53,7 +53,10 @@ export interface FoodLogEntry {
   createdAt: number;
 }
 
-export interface NutritionGoals extends Macros {}
+export interface NutritionGoals extends Macros {
+  /** kcal you can go over (goal + exercise) before the day turns red. Default 100. */
+  overAllowance?: number;
+}
 
 export interface ExerciseGoals {
   /** Calories to burn through exercise per day */

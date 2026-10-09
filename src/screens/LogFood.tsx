@@ -3,12 +3,13 @@ import { AlertCircle, ChevronDown, Plus, Search, Sparkles, Trash2, X } from "luc
 import clsx from "clsx";
 import { allFoods, useApp } from "../store/app";
 import { useUi } from "../store/ui";
-import type { Food, FoodLogEntry, Macros, Meal } from "../types";
+import type { Food, FoodLogEntry, Macros, Meal, NutritionGoals } from "../types";
 import { friendlyDate } from "../lib/date";
 import { fmt } from "../lib/format";
 import { ZERO, add, amountLabel, scale, toServings } from "../lib/nutrition";
 import { bestMatch, gramsPerServing, parseFoodText, rankFoods, suggestions, type Unit } from "../lib/foodText";
-import { sumEntries } from "../lib/nutrition";
+import { BAR_COLOR, calorieStatus, macroSplit, statusColor, sumEntries } from "../lib/nutrition";
+import { dayStats } from "../lib/day";
 import { Button, Field, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
 import { AddMealSheet } from "../components/AddMealSheet";
 
@@ -35,7 +36,6 @@ interface Item {
   suggest: Food[];
 }
 
-const C = { carbs: "#199e70", protein: "#3987e5", fat: "#d95926" };
 
 export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string }) {
   const { pop, push, showToast } = useUi();
@@ -45,6 +45,10 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
   const foodLog = useApp((s) => s.foodLog);
   const goals = useApp((s) => s.nutritionGoals);
   const eatenToday = useMemo(() => sumEntries(foodLog.filter((e) => e.date === date)), [foodLog, date]);
+  const workouts = useApp((s) => s.workouts);
+  const steps = useApp((s) => s.steps);
+  const weights = useApp((s) => s.weights);
+  const exercise = useMemo(() => dayStats(date, { foodLog: [], workouts, steps, weights }).exercise, [date, workouts, steps, weights]);
   const [meal, setMeal] = useState<Meal>(initialMeal);
   const [text, setText] = useState("");
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
@@ -188,7 +192,7 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
         )}
 
         {/* Meal total */}
-        {ready.length > 0 && <MealTotalCard label={mealLabel} count={ready.length} meal={total} before={eatenToday} goals={goals} />}
+        {ready.length > 0 && <MealTotalCard label={mealLabel} count={ready.length} meal={total} before={eatenToday} goals={goals} exercise={exercise} />}
 
         {/* Recent foods for one-tap adding */}
         {recent.length > 0 && (
@@ -319,9 +323,9 @@ function ItemCard({
       <div className="mt-2.5 flex items-center gap-2">
         <AmountControl qty={item.qty} unit={item.unit} gps={item.gps} onChange={onAmount} />
         <div className="flex flex-1 justify-end gap-3 text-xs tabular-nums">
-          <Mac label="C" value={item.macros.carbs} color={C.carbs} />
-          <Mac label="P" value={item.macros.protein} color={C.protein} />
-          <Mac label="F" value={item.macros.fat} color={C.fat} />
+          <Mac label="C" value={item.macros.carbs} />
+          <Mac label="P" value={item.macros.protein} />
+          <Mac label="F" value={item.macros.fat} />
         </div>
       </div>
       {gramsUnknown && (
@@ -383,83 +387,81 @@ export function AmountControl({
   );
 }
 
-function Mac({ label, value, color }: { label: string; value: number; color: string }) {
+function Mac({ label, value }: { label: string; value: number }) {
   return (
     <span className="flex items-center gap-1">
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
       <span className="text-tx2">{label}</span>
       <b className="font-semibold">{fmt(value, 1)}g</b>
     </span>
   );
 }
 
-const METRICS = [
-  { key: "calories", label: "Calories", unit: "kcal", color: "#e8e8ea" },
-  { key: "carbs", label: "Carbs", unit: "g", color: C.carbs },
-  { key: "protein", label: "Protein", unit: "g", color: C.protein },
-  { key: "fat", label: "Fat", unit: "g", color: C.fat },
-] as const;
-
 /**
- * Calories | Carbs | Protein | Fat for the meal being logged. Each bar is today's goal:
- * the faint part is what you'd already eaten today, the bright part is this meal.
+ * Calories | Carbs | Protein | Fat for the meal being logged.
+ * Calories: this meal's share of the daily calorie goal (green/red by how the day ends up).
+ * Macros: share of this meal's calories that comes from each macro — they add up to 100%.
  */
-function MealTotalCard({ label, count, meal, before, goals }: { label: string; count: number; meal: Macros; before: Macros; goals: Macros }) {
-  const after = add(before, meal);
-  const pct = (v: number, g: number) => (g > 0 ? (v / g) * 100 : 0);
-  const kcalLeft = goals.calories - after.calories;
-  const proteinHit = before.protein < goals.protein && after.protein >= goals.protein;
+function MealTotalCard({
+  label,
+  count,
+  meal,
+  before,
+  goals,
+  exercise,
+}: {
+  label: string;
+  count: number;
+  meal: Macros;
+  before: Macros;
+  goals: NutritionGoals;
+  exercise: number;
+}) {
+  const budget = goals.calories + exercise;
+  const after = before.calories + meal.calories;
+  const status = calorieStatus(after, budget, goals.overAllowance);
+  const kcalPct = budget > 0 ? (meal.calories / budget) * 100 : 0;
+  const split = macroSplit(meal);
+  const left = budget - after;
+  const proteinHit = before.protein < goals.protein && before.protein + meal.protein >= goals.protein;
   const message = proteinHit
     ? { icon: "🎯", text: "This meal hits your protein goal!" }
-    : kcalLeft < -goals.calories * 0.05
-      ? { icon: "⚠️", text: `Puts you ${fmt(-kcalLeft)} kcal over today's goal` }
-      : pct(meal.protein, goals.protein) >= 30
-        ? { icon: "💪", text: `${Math.round(pct(meal.protein, goals.protein))}% of today's protein in one meal` }
-        : { icon: "✨", text: `${fmt(Math.max(0, kcalLeft))} kcal left today after this` };
+    : status === "over"
+      ? { icon: "⚠️", text: `Puts you ${fmt(-left)} kcal over today's goal` }
+      : split.protein >= 30
+        ? { icon: "💪", text: `Protein-rich meal — ${Math.round(split.protein)}% of its calories` }
+        : { icon: "✨", text: left >= 0 ? `${fmt(left)} kcal left today after this` : `Within your allowance — ${fmt(-left)} kcal over goal` };
+
+  const cols = [
+    { label: "Calories", value: meal.calories, unit: "kcal", pct: kcalPct, note: "of day", color: statusColor(status) },
+    { label: "Carbs", value: meal.carbs, unit: "g", pct: split.carbs, note: "of meal", color: BAR_COLOR },
+    { label: "Protein", value: meal.protein, unit: "g", pct: split.protein, note: "of meal", color: BAR_COLOR },
+    { label: "Fat", value: meal.fat, unit: "g", pct: split.fat, note: "of meal", color: BAR_COLOR },
+  ];
 
   return (
-    <div className="mt-3 rounded-2xl border border-acc/30 bg-acc/10 p-4">
-      <div className="flex items-baseline justify-between">
-        <div className="text-[15px] font-semibold">
-          {label} total <span className="text-sm font-normal text-tx2">· {count} item{count > 1 ? "s" : ""}</span>
-        </div>
-        <div className="text-[11px] text-tx3">% of daily goal</div>
+    <div className="mt-3 rounded-2xl bg-surf p-4">
+      <div className="text-[15px] font-semibold">
+        {label} total <span className="text-sm font-normal text-tx2">· {count} item{count > 1 ? "s" : ""}</span>
       </div>
 
       <div className="mt-3 grid grid-cols-4 gap-3">
-        {METRICS.map((m) => {
-          const v = meal[m.key];
-          const goal = goals[m.key];
-          const mealPct = pct(v, goal);
-          const beforePct = Math.min(100, pct(before[m.key], goal));
-          const afterPct = pct(after[m.key], goal);
-          const over = afterPct > 105;
-          const onTarget = !over && afterPct >= 90;
-          return (
-            <div key={m.key} className="min-w-0">
-              <div className="flex items-center gap-1 text-[11px] font-medium text-tx2">
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: m.color }} />
-                <span className="truncate">{m.label}</span>
-              </div>
-              <div className="mt-1 text-[22px] font-bold leading-none tabular-nums">{fmt(v, m.unit === "g" && v < 10 ? 1 : 0)}</div>
-              <div className="text-[10px] text-tx3">{m.unit}</div>
-              <div className={clsx("mt-2 flex h-2.5 gap-[2px] overflow-hidden rounded-full bg-surf3", over && "ring-1 ring-bad")}>
-                {beforePct > 0 && <div className="h-full shrink-0 opacity-35 transition-all duration-500" style={{ width: `${beforePct}%`, background: m.color }} />}
-                <div
-                  className="h-full shrink-0 rounded-r-full transition-all duration-500"
-                  style={{ width: `${Math.min(100 - beforePct, mealPct)}%`, background: over ? "#e66767" : m.color }}
-                />
-              </div>
-              <div className="mt-1.5 text-[13px] font-semibold tabular-nums">+{Math.round(mealPct)}%</div>
-              <div className={clsx("text-[10px] tabular-nums", over ? "text-bad" : onTarget ? "text-good" : "text-tx3")}>
-                {Math.round(afterPct)}% today{onTarget ? " ✓" : over ? " ↑" : ""}
-              </div>
+        {cols.map((c) => (
+          <div key={c.label} className="min-w-0">
+            <div className="truncate text-[11px] font-medium text-tx2">{c.label}</div>
+            <div className="mt-1 text-[22px] font-bold leading-none tabular-nums" style={c.label === "Calories" ? { color: c.color } : undefined}>
+              {fmt(c.value, c.unit === "g" && c.value < 10 ? 1 : 0)}
             </div>
-          );
-        })}
+            <div className="text-[10px] text-tx3">{c.unit}</div>
+            <div className="mt-2 h-1 overflow-hidden rounded-full bg-surf3">
+              <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.min(100, c.pct)}%`, background: c.color }} />
+            </div>
+            <div className="mt-1.5 text-[13px] font-semibold tabular-nums">{Math.round(c.pct)}%</div>
+            <div className="text-[10px] text-tx3">{c.note}</div>
+          </div>
+        ))}
       </div>
 
-      <div className="mt-3 flex items-center gap-2 rounded-xl bg-bg/40 px-3 py-2 text-sm">
+      <div className="mt-3 flex items-center gap-2 rounded-xl bg-surf2 px-3 py-2 text-sm">
         <span>{message.icon}</span>
         <span className="text-tx2">{message.text}</span>
       </div>
@@ -548,9 +550,9 @@ export function FoodEntrySheet({ entry, onClose }: { entry: FoodLogEntry; onClos
 
       <div className="mt-4 grid grid-cols-4 gap-2 rounded-2xl bg-surf2 p-3 text-center">
         <Cell label="kcal" value={m.calories} />
-        <Cell label="Carbs" value={m.carbs} unit="g" color={C.carbs} />
-        <Cell label="Protein" value={m.protein} unit="g" color={C.protein} />
-        <Cell label="Fat" value={m.fat} unit="g" color={C.fat} />
+        <Cell label="Carbs" value={m.carbs} unit="g" />
+        <Cell label="Protein" value={m.protein} unit="g" />
+        <Cell label="Fat" value={m.fat} unit="g" />
       </div>
 
       <div className="mt-4">
@@ -610,7 +612,7 @@ export function FoodEntrySheet({ entry, onClose }: { entry: FoodLogEntry; onClos
   );
 }
 
-function Cell({ label, value, unit, color }: { label: string; value: number; unit?: string; color?: string }) {
+function Cell({ label, value, unit }: { label: string; value: number; unit?: string }) {
   return (
     <div>
       <div className="text-lg font-semibold tabular-nums">
@@ -618,7 +620,6 @@ function Cell({ label, value, unit, color }: { label: string; value: number; uni
         {unit && <span className="text-xs font-normal text-tx2">{unit}</span>}
       </div>
       <div className="flex items-center justify-center gap-1 text-[11px] text-tx2">
-        {color && <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />}
         {label}
       </div>
     </div>

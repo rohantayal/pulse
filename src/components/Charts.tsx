@@ -18,7 +18,20 @@ export interface BarDatum {
 }
 
 /** Single-series bar chart with an optional dashed goal line. Tap/hover a bar for its value. */
-export function BarChart({ data, goal, color, unit, height = 180 }: { data: BarDatum[]; goal?: number; color: string; unit: string; height?: number }) {
+export function BarChart({
+  data,
+  goal,
+  color,
+  unit,
+  height = 180,
+}: {
+  data: BarDatum[];
+  goal?: number;
+  /** One colour, or a colour per bar (e.g. green/red by status) */
+  color: string | ((index: number) => string);
+  unit: string;
+  height?: number;
+}) {
   const [hover, setHover] = useState<number | null>(null);
   const W = 340;
   const H = height;
@@ -52,7 +65,7 @@ export function BarChart({ data, goal, color, unit, height = 180 }: { data: BarD
         return (
           <g key={d.key} onMouseEnter={() => setHover(i)} onClick={() => setHover(active ? null : i)} style={{ cursor: "pointer" }}>
             <rect x={pad.l + slot * i} y={pad.t} width={slot} height={ih} fill="transparent" />
-            {path && <path d={path} fill={color} opacity={hover == null || active ? 1 : 0.45} />}
+            {path && <path d={path} fill={typeof color === "function" ? color(i) : color} opacity={hover == null || active ? 1 : 0.45} />}
             <text x={cx} y={H - 6} textAnchor="middle" fontSize="10" fill={active ? "#f2f2f3" : AXIS}>
               {d.label}
             </text>

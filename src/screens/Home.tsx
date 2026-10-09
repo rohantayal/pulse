@@ -7,7 +7,7 @@ import type { FoodLogEntry, MealDef } from "../types";
 import { addDays, dayNum, dowShort, friendlyDate, longDate, todayKey, weekDays, formatDuration } from "../lib/date";
 import { useSwipe } from "../lib/useSwipe";
 import { dayStats } from "../lib/day";
-import { amountLabel, entryMacros, sumEntries } from "../lib/nutrition";
+import { BAR_COLOR, amountLabel, calorieStatus, entryMacros, statusColor, sumEntries } from "../lib/nutrition";
 import { fmt } from "../lib/format";
 import { completedSets, exercisesVolume } from "../lib/workout";
 import { Button, Card, Confirm, NumberInput, ProgressBar, Sheet, SectionTitle, inputCls } from "../components/ui";
@@ -45,6 +45,16 @@ export function Home() {
   };
   const daySwipe = useSwipe(() => go(1), () => go(-1));
   const weekSwipe = useSwipe(() => go(7), () => go(-7));
+
+  // Per-day calorie status for the dots under the week strip
+  const weekStatus = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const k of weekDays(date)) {
+      const st = dayStats(k, { foodLog, workouts, steps, weights });
+      if (st.food.calories > 0) m.set(k, statusColor(calorieStatus(st.food.calories, goals.calories + st.exercise, goals.overAllowance)));
+    }
+    return m;
+  }, [date, foodLog, workouts, steps, weights, goals]);
 
   const marked = useMemo(() => new Set([...foodLog.map((e) => e.date), ...workouts.map((w) => w.date)]), [foodLog, workouts]);
 
@@ -110,7 +120,10 @@ export function Home() {
               >
                 <span className={clsx("text-[11px] font-medium", !sel && isToday && "text-acc")}>{dowShort(k)}</span>
                 <span className={clsx("text-[17px] font-semibold", !sel && (isToday ? "text-acc" : "text-tx"))}>{dayNum(k)}</span>
-                <span className={clsx("mt-0.5 h-1 w-1 rounded-full", has ? (sel ? "bg-white" : "bg-tx3") : "bg-transparent")} />
+                <span
+                  className={clsx("mt-0.5 h-1.5 w-1.5 rounded-full", !has && "bg-transparent", has && !weekStatus.has(k) && (sel ? "bg-white" : "bg-tx3"))}
+                  style={weekStatus.has(k) ? { background: weekStatus.get(k), boxShadow: sel ? "0 0 0 1.5px #fff" : undefined } : undefined}
+                />
               </button>
             );
           })}
@@ -119,14 +132,12 @@ export function Home() {
 
       {/* Day content — swipe to change day */}
       <div {...daySwipe} key={date} className={clsx("flex-1 px-3 pb-36", slide && "animate-fade-in")}>
-        <CalorieCard goal={goals.calories} food={stats.food.calories} exercise={stats.exercise} />
-
-        <Card className="mt-3">
-          <div className="mb-3 text-[15px] font-semibold">Macros</div>
-          <div className="grid grid-cols-3 gap-4">
-            <Macro label="Carbs" now={stats.food.carbs} goal={goals.carbs} color="#199e70" />
-            <Macro label="Protein" now={stats.food.protein} goal={goals.protein} color="#3987e5" />
-            <Macro label="Fat" now={stats.food.fat} goal={goals.fat} color="#d95926" />
+        <Card>
+          <CalorieSection goal={goals.calories} food={stats.food.calories} exercise={stats.exercise} allowance={goals.overAllowance} />
+          <div className="mt-4 grid grid-cols-3 gap-4 border-t border-line pt-4">
+            <Macro label="Carbs" now={stats.food.carbs} goal={goals.carbs} />
+            <Macro label="Protein" now={stats.food.protein} goal={goals.protein} />
+            <Macro label="Fat" now={stats.food.fat} goal={goals.fat} />
           </div>
         </Card>
 
@@ -243,12 +254,13 @@ export function Home() {
   );
 }
 
-function CalorieCard({ goal, food, exercise }: { goal: number; food: number; exercise: number }) {
+function CalorieSection({ goal, food, exercise, allowance }: { goal: number; food: number; exercise: number; allowance?: number }) {
   const remaining = goal - food + exercise;
   const budget = goal + exercise;
-  const over = remaining < 0;
+  const status = calorieStatus(food, budget, allowance);
+  const color = statusColor(status);
   return (
-    <Card>
+    <div>
       <div className="flex items-baseline justify-between">
         <div className="text-[15px] font-semibold">Calories</div>
         <div className="text-xs text-tx2">Goal {fmt(goal)} kcal</div>
@@ -257,16 +269,14 @@ function CalorieCard({ goal, food, exercise }: { goal: number; food: number; exe
         <Stat label="Food" value={food} />
         <Stat label="Exercise" value={exercise} />
         <div>
-          <div className={clsx("text-[28px] font-bold leading-none tabular-nums", over ? "text-bad" : "text-good")}>{fmt(Math.abs(remaining))}</div>
-          <div className="mt-1 text-xs text-tx2">{over ? "Over" : "Remaining"}</div>
+          <div className="text-[28px] font-bold leading-none tabular-nums" style={{ color }}>
+            {fmt(Math.abs(remaining))}
+          </div>
+          <div className="mt-1 text-xs text-tx2">{remaining < 0 ? "Over" : "Remaining"}</div>
         </div>
       </div>
-      <ProgressBar value={food} max={budget} color="#3fb96b" className="mt-4 h-2" />
-      <div className="mt-1.5 flex justify-between text-[11px] text-tx3">
-        <span>{fmt(food)} eaten</span>
-        <span>Goal − Food + Exercise</span>
-      </div>
-    </Card>
+      <ProgressBar value={food} max={budget} color={color} className="mt-4" />
+    </div>
   );
 }
 
@@ -279,19 +289,16 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
-function Macro({ label, now, goal, color }: { label: string; now: number; goal: number; color: string }) {
+function Macro({ label, now, goal }: { label: string; now: number; goal: number }) {
   const left = goal - now;
   return (
     <div>
-      <div className="flex items-center gap-1.5 text-xs font-medium text-tx2">
-        <span className="h-2 w-2 rounded-full" style={{ background: color }} />
-        {label}
-      </div>
+      <div className="text-xs font-medium text-tx2">{label}</div>
       <div className="mt-1 text-[15px] font-semibold tabular-nums">
         {fmt(now)}
         <span className="font-normal text-tx2">/{fmt(goal)} g</span>
       </div>
-      <ProgressBar value={now} max={goal} color={color} className="mt-1.5" />
+      <ProgressBar value={now} max={goal} color={BAR_COLOR} className="mt-1.5 h-1" />
       <div className="mt-1 text-[11px] text-tx3">{left >= 0 ? `${fmt(left)} g left` : `${fmt(-left)} g over`}</div>
     </div>
   );

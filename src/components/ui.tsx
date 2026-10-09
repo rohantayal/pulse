@@ -197,9 +197,21 @@ export function NumberInput({
   );
 }
 
-export function ProgressBar({ value, max, color, className }: { value: number; max: number; color: string; className?: string }) {
+export function ProgressBar({
+  value,
+  max,
+  color,
+  className,
+  redWhenOver,
+}: {
+  value: number;
+  max: number;
+  color: string;
+  className?: string;
+  redWhenOver?: boolean;
+}) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
-  const over = max > 0 && value > max;
+  const over = !!redWhenOver && max > 0 && value > max;
   return (
     <div className={clsx("h-1.5 w-full overflow-hidden rounded-full bg-surf3", className)}>
       <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${pct}%`, background: over ? "#e66767" : color }} />

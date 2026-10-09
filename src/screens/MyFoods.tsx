@@ -152,9 +152,9 @@ export function FoodEditor({ foodId, name }: { foodId?: string; name?: string })
           <div className="mb-3 text-sm font-semibold">Nutrition per serving</div>
           <div className="grid grid-cols-2 gap-3">
             <MacroInput label="Calories" unit="kcal" value={f.calories} onChange={(v) => set("calories", v)} />
-            <MacroInput label="Carbs" unit="g" value={f.carbs} onChange={(v) => set("carbs", v)} dot="#199e70" />
-            <MacroInput label="Protein" unit="g" value={f.protein} onChange={(v) => set("protein", v)} dot="#3987e5" />
-            <MacroInput label="Fat" unit="g" value={f.fat} onChange={(v) => set("fat", v)} dot="#d95926" />
+            <MacroInput label="Carbs" unit="g" value={f.carbs} onChange={(v) => set("carbs", v)} />
+            <MacroInput label="Protein" unit="g" value={f.protein} onChange={(v) => set("protein", v)} />
+            <MacroInput label="Fat" unit="g" value={f.fat} onChange={(v) => set("fat", v)} />
           </div>
           {fromMacros > 0 && Math.abs(fromMacros - f.calories) > Math.max(15, f.calories * 0.15) && (
             <button onClick={() => set("calories", fromMacros)} className="mt-3 w-full rounded-lg bg-surf2 px-3 py-2 text-left text-xs text-tx2">
