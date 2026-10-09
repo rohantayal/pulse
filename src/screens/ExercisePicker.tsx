@@ -4,6 +4,10 @@ import clsx from "clsx";
 import { allExercises, useApp } from "../store/app";
 import { EQUIPMENT, MUSCLES } from "../data/exercises";
 import { Button, Field, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
+import { ExerciseThumb } from "../components/ExerciseThumb";
+import { InfoButton } from "../components/InfoButton";
+import { ExerciseProgress } from "./ExerciseProgress";
+import { primaryLabel } from "../lib/muscles";
 
 /** Full-screen exercise chooser. `multi` lets you tick several and add them in one go. */
 export function ExercisePicker({
@@ -23,6 +27,7 @@ export function ExercisePicker({
   const [muscle, setMuscle] = useState<string | null>(null);
   const [sel, setSel] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
+  const [infoFor, setInfoFor] = useState<string | null>(null);
 
   const usage = useMemo(() => {
     const m = new Map<string, number>();
@@ -77,18 +82,31 @@ export function ExercisePicker({
           {list.map((e) => {
             const on = sel.includes(e.id);
             return (
-              <button key={e.id} onClick={() => toggle(e.id)} className={clsx("flex w-full items-center gap-3 border-b border-line px-4 py-3 text-left last:border-0", on ? "bg-acc/10" : "active:bg-surf2")}>
-                <div className={clsx("flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold", on ? "bg-acc text-white" : "bg-surf3 text-tx2")}>
-                  {on ? <Check size={18} /> : e.name.charAt(0)}
+              <div
+                key={e.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => toggle(e.id)}
+                onKeyDown={(k) => (k.key === "Enter" || k.key === " ") && toggle(e.id)}
+                className={clsx("flex w-full cursor-pointer items-center gap-3 border-b border-line px-4 py-3 text-left last:border-0", on ? "bg-acc/10" : "active:bg-surf2")}
+              >
+                <div className="relative">
+                  <ExerciseThumb exercise={e} />
+                  {on && (
+                    <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-acc text-white">
+                      <Check size={13} strokeWidth={3} />
+                    </span>
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{e.name}</div>
-                  <div className="text-xs text-tx2">
-                    {e.muscle} · {e.equipment}
+                  <div className="truncate text-xs text-tx2">
+                    {primaryLabel(e)} · {e.equipment}
                     {usage.get(e.id) ? ` · done ${usage.get(e.id)}×` : ""}
                   </div>
                 </div>
-              </button>
+                <InfoButton onClick={() => setInfoFor(e.id)} />
+              </div>
             );
           })}
         </div>
@@ -100,6 +118,7 @@ export function ExercisePicker({
           </Button>
         </div>
       )}
+      {infoFor && <ExerciseProgress exerciseId={infoFor} overlay onClose={() => setInfoFor(null)} />}
       <CreateExerciseSheet
         open={creating}
         initialName={q}

@@ -53,7 +53,8 @@ Re-run any time from Settings → Set up my plan again.
 
 **Menu**
 - Settings (kg/lb, backup export/restore, set up my plan again)
-- Nutrition: Daily goals (calories, macros, over-goal allowance, optional lose/maintain/gain helper)
+- Nutrition: Daily goals (calories & macros that always add up, over-goal allowance, optional
+  lose/maintain/gain helper)
   · Weekly summary · Weight tracker
 - Exercise: Daily goals (calories, minutes, workouts/week) · Weekly summary
 
@@ -67,6 +68,11 @@ Re-run any time from Settings → Set up my plan again.
 - New personal records (heaviest weight, best est. 1RM, best set volume, most reps for body-weight moves)
   trigger a golden trophy and a chime. PRs are only awarded once an exercise has history.
 - Previous workouts: history grouped by month, detail view, save as routine, delete.
+- Every exercise shows a small body sketch with its muscles in red (main muscles solid, helpers lighter) and
+  the main muscle by name. The ⓘ next to an exercise opens its page: an animated sketch of the movement,
+  front/back muscle map, a progress chart (heaviest / est. 1RM / volume, or reps for body-weight moves),
+  session history, and personal records (best set, heaviest weight, best est. 1RM, best set volume, most
+  reps in a session, best session volume). The animations are simple stick-figure sketches, not videos.
 
 **Nutrition**
 - Log a meal by typing what you ate: `2 roti, 1 bowl dal, 150g paneer, banana`. Each part is matched

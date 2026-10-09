@@ -107,7 +107,7 @@ function PageView({ page }: { page: Page }) {
     case "workoutEditor":
       return <WorkoutEditor workoutId={page.workoutId} />;
     case "exerciseProgress":
-      return <ExerciseProgress exerciseId={page.exerciseId} />;
+      return <ExerciseProgress exerciseId={page.exerciseId} onClose={() => useUi.getState().pop()} />;
     case "nutritionGoals":
       return <NutritionGoalsPage />;
     case "nutritionWeekly":

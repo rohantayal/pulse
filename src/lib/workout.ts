@@ -141,3 +141,56 @@ export function recomputePrs(workouts: Workout[]): Workout[] {
   }
   return workouts.map((w) => updated.get(w.id)!);
 }
+
+export interface SetRecord {
+  set: WorkoutSet;
+  date: string;
+  workoutId: string;
+}
+
+export interface SessionRecord {
+  value: number;
+  date: string;
+  workoutId: string;
+}
+
+export interface ExerciseRecords {
+  heaviest?: SetRecord;
+  bestOneRm?: SetRecord & { value: number };
+  /** the set with the highest estimated 1RM — the single best-performing set */
+  bestSet?: SetRecord;
+  bestSetVolume?: SetRecord & { value: number };
+  mostRepsSet?: SetRecord;
+  mostSessionReps?: SessionRecord;
+  bestSessionVolume?: SessionRecord;
+  sessions: number;
+}
+
+/** All-time records for one exercise across finished workouts. */
+export function exerciseRecords(history: Workout[], exerciseId: string): ExerciseRecords {
+  const r: ExerciseRecords = { sessions: 0 };
+  for (const w of history) {
+    const sets = w.exercises.filter((e) => e.exerciseId === exerciseId).flatMap((e) => e.sets.filter(isCountable));
+    if (!sets.length) continue;
+    r.sessions++;
+    let reps = 0;
+    let volume = 0;
+    for (const s of sets) {
+      const kg = s.kg ?? 0;
+      const n = s.reps ?? 0;
+      const orm = oneRepMax(kg, n);
+      reps += n;
+      volume += kg * n;
+      const rec = { set: s, date: w.date, workoutId: w.id };
+      if (kg > 0 && (!r.heaviest || kg > (r.heaviest.set.kg ?? 0))) r.heaviest = rec;
+      if (kg > 0 && (!r.bestOneRm || orm > r.bestOneRm.value)) r.bestOneRm = { ...rec, value: orm };
+      if (!r.bestSet || orm > oneRepMax(r.bestSet.set.kg ?? 0, r.bestSet.set.reps ?? 0) || (kg === 0 && n > (r.bestSet.set.reps ?? 0) && !(r.bestSet.set.kg ?? 0)))
+        r.bestSet = rec;
+      if (kg > 0 && (!r.bestSetVolume || kg * n > r.bestSetVolume.value)) r.bestSetVolume = { ...rec, value: kg * n };
+      if (!r.mostRepsSet || n > (r.mostRepsSet.set.reps ?? 0)) r.mostRepsSet = rec;
+    }
+    if (!r.mostSessionReps || reps > r.mostSessionReps.value) r.mostSessionReps = { value: reps, date: w.date, workoutId: w.id };
+    if (volume > 0 && (!r.bestSessionVolume || volume > r.bestSessionVolume.value)) r.bestSessionVolume = { value: volume, date: w.date, workoutId: w.id };
+  }
+  return r;
+}

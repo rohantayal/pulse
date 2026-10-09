@@ -8,6 +8,8 @@ import { fmt } from "../lib/format";
 import { completedSets, exercisesVolume, formatSet, oneRepMax } from "../lib/workout";
 import { Button, Confirm, Empty, PageHeader, Screen, Sheet } from "../components/ui";
 import { useStartWorkout } from "./startWorkout";
+import { ExerciseThumb } from "../components/ExerciseThumb";
+import { primaryLabel } from "../lib/muscles";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -147,9 +149,15 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
           const ex = byId.get(e.exerciseId);
           return (
             <div key={e.id} className="mt-3 rounded-2xl bg-surf p-4">
-              <button onClick={() => push({ kind: "exerciseProgress", exerciseId: e.exerciseId })} className="flex items-center gap-1 font-semibold text-acc">
-                {ex?.name ?? "Unknown exercise"}
-                <ChevronRight size={16} />
+              <button onClick={() => push({ kind: "exerciseProgress", exerciseId: e.exerciseId })} className="flex w-full items-center gap-3 text-left">
+                <ExerciseThumb exercise={ex} size={40} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1 font-semibold text-acc">
+                    <span className="truncate">{ex?.name ?? "Unknown exercise"}</span>
+                    <ChevronRight size={16} className="shrink-0" />
+                  </div>
+                  {ex && <div className="text-xs text-tx3">{primaryLabel(ex)}</div>}
+                </div>
               </button>
               <div className="mt-2 grid grid-cols-[2.5rem_1fr_auto] gap-y-1 text-[11px] font-semibold uppercase tracking-wide text-tx3">
                 <div>Set</div>

@@ -7,6 +7,10 @@ import { uid } from "../lib/id";
 import { Button, Confirm, Field, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
 import { ExercisePicker } from "./ExercisePicker";
 import { TemplatePicker } from "../components/TemplatePicker";
+import { ExerciseThumb } from "../components/ExerciseThumb";
+import { InfoButton } from "../components/InfoButton";
+import { ExerciseProgress } from "./ExerciseProgress";
+import { primaryLabel } from "../lib/muscles";
 import { useStartWorkout } from "./startWorkout";
 
 export function RoutinesPage() {
@@ -137,6 +141,7 @@ export function RoutineEditor({ routineId }: { routineId?: string }) {
   const [name, setName] = useState(existing?.name ?? "");
   const [items, setItems] = useState<RoutineExercise[]>(existing?.exercises ?? []);
   const [picking, setPicking] = useState(false);
+  const [infoFor, setInfoFor] = useState<string | null>(null);
 
   const byId = useMemo(() => new Map(allExercises(custom).map((e) => [e.id, e])), [custom]);
   const valid = name.trim() !== "" && items.length > 0;
@@ -180,9 +185,13 @@ export function RoutineEditor({ routineId }: { routineId?: string }) {
             return (
               <div key={it.id} className="rounded-2xl bg-surf p-4">
                 <div className="flex items-center gap-2">
+                  <ExerciseThumb exercise={ex} size={40} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold text-acc">{ex?.name ?? "Unknown exercise"}</div>
-                    <div className="text-xs text-tx2">{ex ? `${ex.muscle} · ${ex.equipment}` : ""}</div>
+                    <div className="flex items-center">
+                      <div className="truncate font-semibold text-acc">{ex?.name ?? "Unknown exercise"}</div>
+                      {ex && <InfoButton onClick={() => setInfoFor(ex.id)} className="-my-1" />}
+                    </div>
+                    <div className="truncate text-xs text-tx2">{ex ? `${primaryLabel(ex)} · ${ex.equipment}` : ""}</div>
                   </div>
                   <IconBtn label="Move up" onClick={() => move(i, -1)} disabled={i === 0}>
                     <ArrowUp size={16} />
@@ -226,6 +235,7 @@ export function RoutineEditor({ routineId }: { routineId?: string }) {
           <Plus size={16} /> Add exercise
         </Button>
       </div>
+      {infoFor && <ExerciseProgress exerciseId={infoFor} overlay onClose={() => setInfoFor(null)} />}
       {picking && (
         <ExercisePicker
           onClose={() => setPicking(false)}

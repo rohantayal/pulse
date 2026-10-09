@@ -12,6 +12,10 @@ import { PR_LABEL, completedSets, estimateWorkoutCalories, exercisesVolume, form
 import { playPrChime, playRestDone } from "../lib/sound";
 import { Button, Confirm, Field, NumberInput, Sheet, inputCls } from "../components/ui";
 import { ExercisePicker } from "./ExercisePicker";
+import { ExerciseProgress } from "./ExerciseProgress";
+import { ExerciseThumb } from "../components/ExerciseThumb";
+import { InfoButton } from "../components/InfoButton";
+import { primaryLabel } from "../lib/muscles";
 
 function useNow(intervalMs = 1000) {
   const [now, setNow] = useState(() => Date.now());
@@ -47,6 +51,7 @@ export function ActiveWorkout() {
   const [renaming, setRenaming] = useState(false);
   const [flash, setFlash] = useState<PrFlash | null>(null);
   const [restEnd, setRestEnd] = useState<number | null>(null);
+  const [infoFor, setInfoFor] = useState<string | null>(null);
 
   const byId = useMemo(() => new Map(allExercises(custom).map((e) => [e.id, e])), [custom]);
 
@@ -131,6 +136,7 @@ export function ActiveWorkout() {
               previous={previousSets(workouts, we.exerciseId)}
               onTick={tick}
               onMenu={() => setMenuFor(we)}
+              onInfo={() => setInfoFor(we.exerciseId)}
               onSetMenu={(set, n) => setSetMenu({ weId: we.id, set, n })}
             />
           ))}
@@ -173,6 +179,8 @@ export function ActiveWorkout() {
         )}
       </div>
 
+      {infoFor && <ExerciseProgress exerciseId={infoFor} overlay onClose={() => setInfoFor(null)} />}
+
       {flash && <PrCelebration key={flash.key} flash={flash} onClose={() => setFlash(null)} />}
 
       {picker && (
@@ -195,11 +203,8 @@ export function ActiveWorkout() {
               variant="secondary"
               className="w-full justify-start"
               onClick={() => {
-                // Progress opens as a page; minimise the workout so it isn't hidden underneath.
-                const exerciseId = menuFor.exerciseId;
+                setInfoFor(menuFor.exerciseId);
                 setMenuFor(null);
-                setWorkoutOpen(false);
-                useUi.getState().push({ kind: "exerciseProgress", exerciseId });
               }}
             >
               <TrendingUp size={16} /> See progress
@@ -295,6 +300,7 @@ function ExerciseBlock({
   onTick,
   onMenu,
   onSetMenu,
+  onInfo,
 }: {
   we: WorkoutExercise;
   exercise?: Exercise;
@@ -302,16 +308,20 @@ function ExerciseBlock({
   onTick: (we: WorkoutExercise, s: WorkoutSet, prev?: WorkoutSet) => void;
   onMenu: () => void;
   onSetMenu: (s: WorkoutSet, n: number) => void;
+  onInfo: () => void;
 }) {
   const store = useApp.getState();
   const unit = useApp((s) => s.unit);
   return (
     <section className="border-b border-line px-4 py-4">
       <div className="mb-3 flex items-center gap-2">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surf3 text-sm font-bold text-tx2">{exercise?.name.charAt(0) ?? "?"}</div>
+        <ExerciseThumb exercise={exercise} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[16px] font-semibold text-acc">{exercise?.name ?? "Unknown exercise"}</div>
-          {exercise && <div className="text-xs text-tx3">{exercise.muscle}</div>}
+          <div className="flex items-center">
+            <div className="truncate text-[16px] font-semibold text-acc">{exercise?.name ?? "Unknown exercise"}</div>
+            {exercise && <InfoButton onClick={onInfo} className="-my-1 ml-0.5" />}
+          </div>
+          {exercise && <div className="text-xs text-tx3">{primaryLabel(exercise)}</div>}
         </div>
         <button onClick={onMenu} className="rounded-full p-1.5 text-tx2 active:bg-surf2" aria-label="Exercise options">
           <MoreHorizontal size={20} />

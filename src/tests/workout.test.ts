@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Workout, WorkoutSet } from "../types";
-import { bestsFromSets, detectPRs, exerciseBests, exercisesVolume, oneRepMax, previousSets, recomputePrs } from "../lib/workout";
+import { bestsFromSets, detectPRs, exerciseBests, exercisesVolume, oneRepMax, previousSets, recomputePrs, exerciseRecords } from "../lib/workout";
 
 const set = (kg: number | null, reps: number | null, done = true): WorkoutSet => ({ id: Math.random().toString(), kg, reps, done });
 
@@ -65,5 +65,24 @@ describe("recomputePrs", () => {
     out = recomputePrs([w1, edited, w3]);
     expect(out.find((w) => w.id === "3")!.exercises[0].sets[0].pr).toContain("weight");
     expect(out.find((w) => w.id === "1")!.exercises[0].sets[0].pr).toBeUndefined(); // first time: no PR
+  });
+});
+
+describe("exerciseRecords", () => {
+  it("finds every kind of personal record", () => {
+    const h = [
+      { ...workout(1, "bench", [set(80, 8), set(80, 8), set(80, 6)]), date: "2026-10-01", id: "a" },
+      { ...workout(2, "bench", [set(90, 3), set(70, 12)]), date: "2026-10-03", id: "b" },
+    ];
+    const r = exerciseRecords(h, "bench");
+    expect(r.sessions).toBe(2);
+    expect(r.heaviest?.set.kg).toBe(90);
+    // Epley: 80×8 → 101.3 beats 90×3 → 99 and 70×12 → 98
+    expect(r.bestOneRm?.value).toBeCloseTo(101.3, 1);
+    expect(r.bestSet?.set).toMatchObject({ kg: 80, reps: 8 });
+    expect(r.bestSetVolume?.value).toBe(840); // 70 × 12
+    expect(r.mostRepsSet?.set.reps).toBe(12);
+    expect(r.mostSessionReps).toMatchObject({ value: 22, workoutId: "a" });
+    expect(r.bestSessionVolume).toMatchObject({ value: 1760, workoutId: "a" });
   });
 });
