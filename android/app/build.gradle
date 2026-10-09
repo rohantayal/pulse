@@ -8,8 +8,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI passes the build number so every new APK installs over the previous one.
-        versionCode (System.getenv("VERSION_CODE") ?: "1") as Integer
-        versionName System.getenv("VERSION_NAME") ?: "1.0"
+        versionCode(Integer.parseInt(System.getenv("VERSION_CODE") ?: "1"))
+        versionName(System.getenv("VERSION_NAME") ?: "1.0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -22,9 +22,9 @@ android {
     signingConfigs {
         release {
             storeFile file(System.getenv("PULSE_KEYSTORE") ?: "pulse.keystore")
-            storePassword System.getenv("PULSE_KEYSTORE_PASSWORD") ?: "pulse-android"
-            keyAlias System.getenv("PULSE_KEY_ALIAS") ?: "pulse"
-            keyPassword System.getenv("PULSE_KEY_PASSWORD") ?: "pulse-android"
+            storePassword(System.getenv("PULSE_KEYSTORE_PASSWORD") ?: "pulse-android")
+            keyAlias(System.getenv("PULSE_KEY_ALIAS") ?: "pulse")
+            keyPassword(System.getenv("PULSE_KEY_PASSWORD") ?: "pulse-android")
         }
     }
     buildTypes {
