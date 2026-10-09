@@ -1,12 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { Download, Footprints, HeartPulse, RefreshCw, Scale, Upload, UserRound } from "lucide-react";
+import { useRef, useState } from "react";
+import { Download, Scale, Upload, UserRound } from "lucide-react";
 import clsx from "clsx";
 import { useApp } from "../store/app";
 import { useUi } from "../store/ui";
 import { isNative } from "../lib/platform";
 import { describeBackup, makeBackup, parseBackup, saveBackupFile, type BackupFile } from "../lib/backup";
-import { connectSteps, healthStatus, installHealthConnect, openHealthConnect, type HealthStatus } from "../lib/health";
-import { syncStepsNow } from "../lib/useStepSync";
 import { Button, Card, Confirm, PageHeader, Screen, SectionTitle } from "../components/ui";
 
 function ago(ts?: number) {
@@ -23,42 +21,9 @@ function ago(ts?: number) {
 export function SettingsPage() {
   const { pop, push, showToast } = useUi();
   const unit = useApp((s) => s.unit);
-  const health = useApp((s) => s.healthSteps);
   const lastBackupAt = useApp((s) => s.lastBackupAt);
-  const [status, setStatus] = useState<HealthStatus | null>(null);
-  const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<BackupFile | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    void healthStatus().then(setStatus);
-  }, []);
-
-  async function connect() {
-    setBusy(true);
-    try {
-      if (await connectSteps()) {
-        const n = await syncStepsNow();
-        showToast(n ? `Synced steps for ${n} day${n > 1 ? "s" : ""}` : "Connected — no steps recorded yet");
-      } else showToast("Permission not granted");
-    } catch {
-      showToast("Couldn't reach Health Connect");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function sync() {
-    setBusy(true);
-    try {
-      const n = await syncStepsNow();
-      showToast(`Synced steps for ${n} day${n === 1 ? "" : "s"}`);
-    } catch {
-      showToast("Couldn't reach Health Connect");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function exportNow() {
     try {
@@ -92,47 +57,6 @@ export function SettingsPage() {
               </button>
             ))}
           </div>
-        </Card>
-
-        <SectionTitle>Steps</SectionTitle>
-        <Card>
-          <div className="flex items-start gap-3">
-            <HeartPulse size={20} className="mt-0.5 text-tx2" />
-            <div className="flex-1">
-              <div className="font-medium">Health Connect</div>
-              <div className="text-sm text-tx2">
-                {status === null
-                  ? "Checking…"
-                  : status === "unsupported"
-                    ? "Available in the Android app. In the browser, log steps by hand."
-                    : status === "not-installed"
-                      ? "Install Health Connect to bring in steps from Google Fit, Samsung Health or your band."
-                      : health.enabled
-                        ? `Connected · synced ${ago(health.lastSync)}`
-                        : "Bring in your daily steps automatically from Google Fit, Samsung Health or your band."}
-              </div>
-            </div>
-          </div>
-          {status === "ready" && !health.enabled && (
-            <Button className="mt-3 w-full" disabled={busy} onClick={connect}>
-              <Footprints size={16} /> Connect steps
-            </Button>
-          )}
-          {status === "ready" && health.enabled && (
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button variant="secondary" disabled={busy} onClick={sync}>
-                <RefreshCw size={16} className={busy ? "animate-spin" : ""} /> Sync now
-              </Button>
-              <Button variant="secondary" onClick={() => void openHealthConnect()}>
-                Manage
-              </Button>
-            </div>
-          )}
-          {status === "not-installed" && (
-            <Button variant="secondary" className="mt-3 w-full" onClick={() => void installHealthConnect()}>
-              Get Health Connect
-            </Button>
-          )}
         </Card>
 
         <SectionTitle>Backup</SectionTitle>

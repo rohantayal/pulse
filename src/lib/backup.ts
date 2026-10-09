@@ -15,13 +15,11 @@ export const DATA_KEYS = [
   "nutritionGoals",
   "exerciseGoals",
   "weights",
-  "steps",
   "customExercises",
   "routines",
   "workouts",
   "active",
   "settings",
-  "healthSteps",
 ] as const;
 
 export interface BackupFile {
@@ -50,7 +48,7 @@ export function parseBackup(text: string): BackupFile {
     throw new Error("That file isn't a Pulse backup.");
   }
   if (b.version !== 1) throw new Error("This backup was made by a newer version of Pulse. Update the app first.");
-  for (const k of ["foodLog", "workouts", "routines", "customFoods", "weights", "steps"]) {
+  for (const k of ["foodLog", "workouts", "routines", "customFoods", "weights"]) {
     if (k in b.data && !Array.isArray((b.data as Record<string, unknown>)[k])) throw new Error("The backup file is damaged.");
   }
   return b as BackupFile;

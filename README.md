@@ -25,9 +25,6 @@ one and keep your data. Requires Android 8.0+.
 - Settings → Backup → **Export** saves a file (share it to Drive/WhatsApp/Files) and **Restore** loads one.
   Use this before uninstalling or switching phones; it's instant and doesn't depend on Google's schedule.
 
-**Steps:** Settings → Steps → Connect Health Connect. Pulse reads daily steps (only steps) that Google Fit,
-Samsung Health, Fitbit or your band write to Health Connect, and refreshes them whenever the app opens.
-
 **Signing:** `android/app/pulse.keystore` is committed so every CI build can update the installed app. If
 the repo ever becomes public or you publish to the Play Store, create a new key, keep it out of git, and
 pass it via the `PULSE_KEYSTORE*` environment variables (see `android/app/build.gradle`).
@@ -37,8 +34,10 @@ open `android/` in Android Studio.
 
 ## What's in it
 
-**First launch:** Welcome → About you (sex, age, height, weight) → Your plan (calories, macros, steps —
-estimated with Mifflin–St Jeor, all editable) → Done. Re-run any time from Menu → Set up my plan.
+**First launch:** Welcome → About you (sex, age, height, weight, kg/lb) → Your plan (calories and macros,
+estimated with Mifflin–St Jeor; editing calories rescales the macros and editing a macro updates calories, so
+they always match) → Build your first routine (templates, create your own, or skip) → Done.
+Re-run any time from Settings → Set up my plan again.
 
 **Today (home)**
 - Top bar: menu · date (tap for a month calendar) · share (shares/copies the day's summary)
@@ -48,18 +47,19 @@ estimated with Mifflin–St Jeor, all editable) → Done. Re-run any time from M
 - Meals (Breakfast / Lunch / Dinner / Snacks + your own). Each meal shows its own card: calories as % of
   the day, each macro's share of the meal, and honest feedback on that meal alone (size vs. a typical
   meal, macro balance, protein). Other meals never change it.
-- Exercise: the day's workouts and steps; body weight; a "Getting started" checklist for new users
+- Exercise: the day's workouts; body weight; a "Getting started" checklist for new users
 
 **Bottom bar:** Previous workouts · Workout routines · **Today** (pill) · My Foods · **+** (Workout or Food)
 
 **Menu**
-- Set up my plan · Settings (kg/lb, Health Connect steps, backup export/restore)
+- Settings (kg/lb, backup export/restore, set up my plan again)
 - Nutrition: Daily goals (calories, macros, over-goal allowance, optional lose/maintain/gain helper)
   · Weekly summary · Weight tracker
-- Exercise: Daily goals (calories, minutes, workouts/week, steps) · Weekly summary · Step tracker
+- Exercise: Daily goals (calories, minutes, workouts/week) · Weekly summary
 
 **Workouts**
-- Routines: create/edit/delete, set count and rep range per exercise, start with one tap (3 sample routines are seeded)
+- Routines: create/edit/delete, set count and rep range per exercise, start with one tap; starter templates
+  (Full Body, Push, Pull, Legs, Upper, Lower) offered in setup and on an empty Routines page
 - Live workout: Duration · Volume · Sets header; per exercise a SET | PREVIOUS | KG | REPS | ✓ table.
   KG/REPS placeholders show what you did last time; tapping PREVIOUS copies it; ticking an empty set uses it.
 - + Add set, + Add exercise (65 preloaded exercises + your own), replace/reorder/remove, rest timer,

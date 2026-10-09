@@ -63,7 +63,6 @@ export interface ExerciseGoals {
   calories: number;
   /** Minutes of exercise per day */
   minutes: number;
-  steps: number;
   /** Workouts per week */
   workoutsPerWeek: number;
 }
@@ -71,11 +70,6 @@ export interface ExerciseGoals {
 export interface WeightEntry {
   date: string;
   kg: number;
-}
-
-export interface StepEntry {
-  date: string;
-  steps: number;
 }
 
 // ---------- Workouts ----------

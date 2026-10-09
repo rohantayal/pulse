@@ -28,10 +28,6 @@ export function macroCalories(m: Pick<Macros, "carbs" | "protein" | "fat">): num
   return m.carbs * 4 + m.protein * 4 + m.fat * 9;
 }
 
-/** Calories burned walking. ~0.04 kcal per step for a 70 kg person, scaled by body weight. */
-export function stepCalories(steps: number, bodyKg = 70): number {
-  return steps * 0.04 * (bodyKg / 70);
-}
 
 /** Most recent body weight logged on or before `date`. */
 export function latestWeight(weights: WeightEntry[], onOrBefore: string): number | undefined {

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronRight, Dumbbell, Footprints, Menu, MoreHorizontal, Pencil, Plus, Scale, Share2, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronRight, Dumbbell, Menu, MoreHorizontal, Pencil, Plus, Scale, Share2, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { isCustomMeal, useApp, useUnit } from "../store/app";
 import { fromUnit } from "../lib/units";
@@ -7,7 +7,6 @@ import { useUi } from "../store/ui";
 import type { FoodLogEntry, MealDef, NutritionGoals } from "../types";
 import { addDays, dayNum, dowShort, friendlyDate, longDate, todayKey, weekDays, formatDuration } from "../lib/date";
 import { useSlide } from "../lib/useSlide";
-import { syncStepsNow } from "../lib/useStepSync";
 import { dayStats } from "../lib/day";
 import { BAR_COLOR, amountLabel, calorieStatus, entryMacros, statusColor, sumEntries, type CalorieStatus } from "../lib/nutrition";
 import { fmt } from "../lib/format";
@@ -25,32 +24,18 @@ export function Home() {
   const setDate = useApp((s) => s.setDate);
   const foodLog = useApp((s) => s.foodLog);
   const workouts = useApp((s) => s.workouts);
-  const steps = useApp((s) => s.steps);
   const weights = useApp((s) => s.weights);
   const goals = useApp((s) => s.nutritionGoals);
-  const exGoals = useApp((s) => s.exerciseGoals);
   const meals = useApp((s) => s.meals);
   const { setMenu, push, showToast } = useUi();
 
   const [calOpen, setCalOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<FoodLogEntry | null>(null);
-  const [stepsOpen, setStepsOpen] = useState(false);
-  const healthOn = useApp((s) => s.healthSteps.enabled);
-  // With Health Connect connected, steps are automatic — tapping refreshes instead of asking.
-  async function onStepsTap() {
-    if (!healthOn) return setStepsOpen(true);
-    try {
-      await syncStepsNow();
-      showToast("Steps updated from Health Connect");
-    } catch {
-      showToast("Couldn't reach Health Connect");
-    }
-  }
   const [weightOpen, setWeightOpen] = useState(false);
   const [addingMeal, setAddingMeal] = useState(false);
   const [mealMenu, setMealMenu] = useState<MealDef | null>(null);
 
-  const stats = useMemo(() => dayStats(date, { foodLog, workouts, steps, weights }), [date, foodLog, workouts, steps, weights]);
+  const stats = useMemo(() => dayStats(date, { foodLog, workouts }), [date, foodLog, workouts]);
   const dayEntries = useMemo(() => foodLog.filter((e) => e.date === date), [foodLog, date]);
   const weight = weights.find((w) => w.date === date)?.kg;
 
@@ -68,11 +53,11 @@ export function Home() {
   const weekStatus = useMemo(() => {
     const m = new Map<string, CalorieStatus>();
     for (const k of weekDays(date)) {
-      const st = dayStats(k, { foodLog, workouts, steps, weights });
+      const st = dayStats(k, { foodLog, workouts });
       if (st.food.calories > 0) m.set(k, calorieStatus(st.food.calories, goals.calories + st.exercise, goals.overAllowance));
     }
     return m;
-  }, [date, foodLog, workouts, steps, weights, goals]);
+  }, [date, foodLog, workouts, goals]);
 
   const marked = useMemo(() => new Set([...foodLog.map((e) => e.date), ...workouts.map((w) => w.date)]), [foodLog, workouts]);
 
@@ -83,7 +68,6 @@ export function Home() {
       `${longDate(date)}`,
       `Calories: ${fmt(stats.food.calories)} eaten · ${fmt(stats.exercise)} burned · ${fmt(remaining)} remaining (goal ${fmt(goals.calories)})`,
       `Carbs ${fmt(stats.food.carbs)}/${goals.carbs} g · Protein ${fmt(stats.food.protein)}/${goals.protein} g · Fat ${fmt(stats.food.fat)}/${goals.fat} g`,
-      stats.steps ? `Steps: ${fmt(stats.steps)}` : "",
       ...stats.workouts.map(
         (w) => `🏋️ ${w.name} – ${formatDuration(w.endedAt - w.startedAt)}, ${fmt(show(exercisesVolume(w.exercises)))} ${unit} volume, ${completedSets(w.exercises)} sets`,
       ),
@@ -203,29 +187,10 @@ export function Home() {
               <div className="text-sm font-semibold">{w.caloriesBurned} kcal</div>
             </button>
           ))}
-          <button onClick={onStepsTap} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-surf2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-good/15 text-good">
-              <Footprints size={18} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 font-medium">
-                Steps
-                {healthOn && <span className="rounded bg-good/15 px-1.5 py-0.5 text-[10px] font-semibold text-good">AUTO</span>}
-              </div>
-              <ProgressBar value={stats.steps} max={exGoals.steps} color="#3fb96b" className="mt-1.5" />
-            </div>
-            <div className="text-right">
-              <div className="text-sm font-semibold">{fmt(stats.steps)}</div>
-              <div className="text-[11px] text-tx3">/ {fmt(exGoals.steps)}</div>
-            </div>
+          <button onClick={() => useUi.getState().setAdd(true)} className="flex w-full items-center gap-2 px-4 py-3 text-sm font-semibold text-acc active:bg-surf2">
+            <Plus size={16} /> Add workout
           </button>
         </Card>
-        <button
-          onClick={() => useUi.getState().setAdd(true)}
-          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold text-acc active:bg-surf"
-        >
-          <Plus size={16} /> Add workout
-        </button>
 
         {/* Body */}
         <SectionTitle>Body</SectionTitle>
@@ -264,15 +229,6 @@ export function Home() {
       <AddMealSheet open={addingMeal} onClose={() => setAddingMeal(false)} />
       {mealMenu && <MealMenuSheet meal={mealMenu} onClose={() => setMealMenu(null)} />}
       {editEntry && <FoodEntrySheet entry={editEntry} onClose={() => setEditEntry(null)} />}
-      <QuickNumberSheet
-        open={stepsOpen}
-        title="Steps"
-        initial={stats.steps || null}
-        suffix="steps"
-        step="1"
-        onClose={() => setStepsOpen(false)}
-        onSave={(v) => useApp.getState().setSteps(date, v && v > 0 ? Math.round(v) : null)}
-      />
       <QuickNumberSheet
         open={weightOpen}
         title="Body weight"

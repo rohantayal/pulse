@@ -8,7 +8,7 @@ import { todayKey } from "../lib/date";
 
 /** A short first-week checklist that ticks itself off from real data. */
 export function GettingStarted() {
-  const { onboarded, checklistDismissed, foodLog, workouts, steps, nutritionGoals } = useApp();
+  const { onboarded, checklistDismissed, foodLog, workouts, routines, nutritionGoals } = useApp();
   const { push, setAdd } = useUi();
 
   const greenDay = useMemo(() => {
@@ -27,7 +27,7 @@ export function GettingStarted() {
   const items = [
     { done: foodLog.length > 0, label: "Log your first meal", action: () => push({ kind: "logFood", meal: "breakfast", date: todayKey() }) },
     { done: workouts.length > 0, label: "Finish a workout", action: () => setAdd(true) },
-    { done: steps.length > 0, label: "Log today's steps", action: () => push({ kind: "steps" }) },
+    { done: routines.length > 0, label: "Build a workout routine", action: () => push({ kind: "routineEditor" }) },
     { done: greenDay, label: "Have a green day — eat close to your goal", action: undefined },
   ];
   const doneCount = items.filter((i) => i.done).length;

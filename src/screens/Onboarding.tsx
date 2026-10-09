@@ -1,24 +1,26 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Activity as ActivityIcon, Check, ChevronLeft, Dumbbell, Flame, PieChart, Target, Trophy, Utensils } from "lucide-react";
+import { Check, ChevronLeft, Dumbbell, Flame, PieChart, Target, Trophy, Utensils } from "lucide-react";
 import clsx from "clsx";
 import { useApp } from "../store/app";
-import { buildPlan, type Profile, type Sex } from "../lib/plan";
+import { buildPlan, macroKcal, macrosFor, splitOf, type MacroGrams, type Profile, type Sex } from "../lib/plan";
 import { fmt } from "../lib/format";
 import { fromUnit, toUnit } from "../lib/units";
 import { Button, NumberInput, inputCls } from "../components/ui";
+import { TemplatePicker } from "../components/TemplatePicker";
+import type { Page } from "../store/ui";
 
 // Kept deliberately short: only what the app needs to set your targets — no judging questions.
-type Step = "welcome" | "about" | "plan" | "done";
-const STEPS: Step[] = ["welcome", "about", "plan", "done"];
+type Step = "welcome" | "about" | "plan" | "routine" | "done";
+const STEPS: Step[] = ["welcome", "about", "plan", "routine", "done"];
 
 const DEFAULT: Profile = { sex: "male", age: 25, heightCm: 170, weightKg: 70, activity: "light", goal: "maintain", pace: 0.5, workoutsPerWeek: 3 };
 
 /**
- * First-run setup: Welcome → About you → Your plan → Done.
+ * First-run setup: Welcome → About you → Your plan → Build your first routine (skippable) → Done.
  * The plan is a plain estimate of what your body uses in a day (lightly active, maintain);
  * everything on it is editable, and goals can be changed later in Menu → Daily goals.
  */
-export function Onboarding({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void }) {
+export function Onboarding({ onDone, onCancel }: { onDone: (next?: Page) => void; onCancel?: () => void }) {
   const existing = useApp((s) => s.profile);
   const [step, setStep] = useState<Step>(existing ? "about" : "welcome");
   const [p, setP] = useState<Profile>(existing ?? DEFAULT);
@@ -70,7 +72,8 @@ export function Onboarding({ onDone, onCancel }: { onDone: () => void; onCancel?
             />
           )}
           {step === "plan" && <PlanStep p={full} onSaved={next} />}
-          {step === "done" && <DoneStep name={full.name} onDone={onDone} />}
+          {step === "routine" && <RoutineStep onNext={next} onCreateOwn={() => onDone({ kind: "routineEditor" })} />}
+          {step === "done" && <DoneStep name={full.name} onDone={() => onDone()} />}
         </div>
 
         {(step === "welcome" || step === "about") && (
@@ -252,19 +255,31 @@ function AboutStep(props: {
 
 function PlanStep({ p, onSaved }: { p: Profile; onSaved: () => void }) {
   const plan = useMemo(() => buildPlan(p), [p]);
-  const [calories, setCalories] = useState<number | null>(plan.calories);
-  const [protein, setProtein] = useState<number | null>(plan.protein);
-  const [carbs, setCarbs] = useState<number | null>(plan.carbs);
-  const [fat, setFat] = useState<number | null>(plan.fat);
-  const [steps, setSteps] = useState<number | null>(plan.steps);
-  const valid = [calories, protein, carbs, fat, steps].every((v) => v != null && v >= 0) && (calories ?? 0) >= 800;
+  // Calories and macros stay in step: editing calories rescales the macros (same split),
+  // editing a macro updates calories to what the macros add up to.
+  const [calories, setCalories] = useState<number | null>(() => macroKcal(plan));
+  const [m, setM] = useState<MacroGrams>({ protein: plan.protein, carbs: plan.carbs, fat: plan.fat });
+  const [split, setSplit] = useState(() => splitOf(plan));
+
+  const changeCalories = (v: number | null) => {
+    setCalories(v);
+    if (v != null && v > 0) setM(macrosFor(v, split));
+  };
+  const changeMacro = (k: keyof MacroGrams, v: number | null) => {
+    const next = { ...m, [k]: Math.max(0, Math.round(v ?? 0)) };
+    setM(next);
+    setSplit(splitOf(next));
+    setCalories(macroKcal(next));
+  };
+
+  const sum = macroKcal(m);
+  const matches = calories != null && Math.abs(sum - calories) <= 4;
+  const pct = (x: number) => Math.round(x * 100);
+  const valid = calories != null && calories >= 800 && matches;
 
   function save() {
     if (!valid) return;
-    useApp.getState().completeOnboarding(p, {
-      nutrition: { calories: calories!, protein: protein!, carbs: carbs!, fat: fat! },
-      steps: steps!,
-    });
+    useApp.getState().completeOnboarding(p, { nutrition: { calories: calories!, ...m } });
     onSaved();
   }
 
@@ -280,27 +295,59 @@ function PlanStep({ p, onSaved }: { p: Profile; onSaved: () => void }) {
 
       <div className="mt-5 space-y-3 rounded-2xl bg-surf p-4">
         <Row icon={<Target size={18} />} label="Calories" hint="kcal / day">
-          <NumberInput value={calories} onChange={(v) => setCalories(v == null ? null : Math.round(v))} step="1" />
+          <NumberInput value={calories} onChange={(v) => changeCalories(v == null ? null : Math.round(v))} step="1" />
         </Row>
-        <Row icon={<Trophy size={18} />} label="Protein" hint="g / day">
-          <NumberInput value={protein} onChange={(v) => setProtein(v == null ? null : Math.round(v))} suffix="g" step="1" />
+        <Row icon={<Trophy size={18} />} label="Protein" hint={`${pct(split.protein)}% of calories`}>
+          <NumberInput value={m.protein} onChange={(v) => changeMacro("protein", v)} suffix="g" step="1" />
         </Row>
-        <Row icon={<Utensils size={18} />} label="Carbs" hint="g / day">
-          <NumberInput value={carbs} onChange={(v) => setCarbs(v == null ? null : Math.round(v))} suffix="g" step="1" />
+        <Row icon={<Utensils size={18} />} label="Carbs" hint={`${pct(split.carbs)}% of calories`}>
+          <NumberInput value={m.carbs} onChange={(v) => changeMacro("carbs", v)} suffix="g" step="1" />
         </Row>
-        <Row icon={<Flame size={18} />} label="Fat" hint="g / day">
-          <NumberInput value={fat} onChange={(v) => setFat(v == null ? null : Math.round(v))} suffix="g" step="1" />
+        <Row icon={<Flame size={18} />} label="Fat" hint={`${pct(split.fat)}% of calories`}>
+          <NumberInput value={m.fat} onChange={(v) => changeMacro("fat", v)} suffix="g" step="1" />
         </Row>
-        <Row icon={<ActivityIcon size={18} />} label="Steps" hint="per day">
-          <NumberInput value={steps} onChange={(v) => setSteps(v == null ? null : Math.round(v))} step="1" />
-        </Row>
+        <div className={clsx("flex items-center gap-1.5 border-t border-line pt-3 text-xs", matches ? "text-good" : "text-gold")}>
+          {matches ? <Check size={14} strokeWidth={3} /> : null}
+          {matches ? `Macros add up to ${fmt(sum)} kcal` : `Macros add up to ${fmt(sum)} kcal — enter calories to rebalance`}
+        </div>
       </div>
 
-      <p className="mt-4 text-xs leading-relaxed text-tx3">A starting point, not a rule. You can change these any time in Menu → Daily goals.</p>
+      <p className="mt-4 text-xs leading-relaxed text-tx3">Protein and carbs have 4 kcal per gram, fat has 9. A starting point, not a rule — change it any time in Menu → Daily goals.</p>
 
       <div className="pb-safe fixed inset-x-0 bottom-0 mx-auto max-w-md bg-gradient-to-t from-bg via-bg to-transparent px-5 pt-6">
         <Button className="mb-5 h-12 w-full text-base" disabled={!valid} onClick={save}>
           Continue
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function RoutineStep({ onNext, onCreateOwn }: { onNext: () => void; onCreateOwn: () => void }) {
+  const [picked, setPicked] = useState<string[]>([]);
+  const toggle = (k: string) => setPicked((x) => (x.includes(k) ? x.filter((y) => y !== k) : [...x, k]));
+  return (
+    <div>
+      <div className="flex items-start justify-between">
+        <Title sub="Pick one or more to start from — you can edit them any time.">Build your first routine</Title>
+        <button onClick={onNext} className="mt-3 shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold text-tx2 active:bg-surf2">
+          Skip
+        </button>
+      </div>
+      <TemplatePicker selected={picked} onToggle={toggle} />
+      <button onClick={onCreateOwn} className="mt-4 w-full rounded-2xl border border-dashed border-line py-3 text-sm font-semibold text-acc active:bg-surf">
+        Create my own instead
+      </button>
+      <div className="pb-safe fixed inset-x-0 bottom-0 mx-auto max-w-md bg-gradient-to-t from-bg via-bg to-transparent px-5 pt-6">
+        <Button
+          className="mb-5 h-12 w-full text-base"
+          variant={picked.length ? "primary" : "secondary"}
+          onClick={() => {
+            if (picked.length) useApp.getState().addTemplateRoutines(picked);
+            onNext();
+          }}
+        >
+          {picked.length ? `Add ${picked.length} routine${picked.length > 1 ? "s" : ""}` : "Skip for now"}
         </Button>
       </div>
     </div>

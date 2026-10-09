@@ -24,27 +24,6 @@
 
         </activity>
 
-        <!-- Health Connect: screen shown when the user taps "privacy policy" on the permission
-             dialog (Android 13 and older) … -->
-        <activity
-            android:name="com.fit_up.health.capacitor.PermissionsRationaleActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
-            </intent-filter>
-        </activity>
-        <!-- … and the same for Android 14+. -->
-        <activity-alias
-            android:name="ViewPermissionUsageActivity"
-            android:exported="true"
-            android:targetActivity="com.fit_up.health.capacitor.PermissionsRationaleActivity"
-            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
-                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
-            </intent-filter>
-        </activity-alias>
-
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -59,10 +38,4 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Only steps are read from Health Connect; nothing is written. -->
-    <uses-permission android:name="android.permission.health.READ_STEPS" />
-
-    <queries>
-        <package android:name="com.google.android.apps.healthdata" />
-    </queries>
 </manifest>

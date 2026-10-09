@@ -29,11 +29,11 @@ export interface Profile {
   workoutsPerWeek: number;
 }
 
-export const ACTIVITY: Record<Activity, { label: string; hint: string; factor: number; steps: number }> = {
-  sedentary: { label: "Mostly sitting", hint: "Desk job, little walking", factor: 1.2, steps: 6000 },
-  light: { label: "Lightly active", hint: "On your feet some of the day, short walks", factor: 1.375, steps: 8000 },
-  moderate: { label: "Active", hint: "On your feet most of the day, or a physical job", factor: 1.55, steps: 10000 },
-  very: { label: "Very active", hint: "Hard physical work or training most days", factor: 1.725, steps: 12000 },
+export const ACTIVITY: Record<Activity, { label: string; hint: string; factor: number }> = {
+  sedentary: { label: "Mostly sitting", hint: "Desk job, little walking", factor: 1.2 },
+  light: { label: "Lightly active", hint: "On your feet some of the day, short walks", factor: 1.375 },
+  moderate: { label: "Active", hint: "On your feet most of the day, or a physical job", factor: 1.55 },
+  very: { label: "Very active", hint: "Hard physical work or training most days", factor: 1.725 },
 };
 
 export const KCAL_PER_KG = 7700;
@@ -73,7 +73,6 @@ export interface Plan {
   protein: number;
   carbs: number;
   fat: number;
-  steps: number;
   /** Notes about adjustments the safety rails made */
   notes: string[];
 }
@@ -107,5 +106,42 @@ export function buildPlan(p: Profile): Plan {
   const fat = Math.round((calories * 0.27) / 9);
   const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
 
-  return { bmr: Math.round(base), tdee: Math.round(burn), calories, protein, carbs, fat, steps: ACTIVITY[p.activity].steps, notes };
+  return { bmr: Math.round(base), tdee: Math.round(burn), calories, protein, carbs, fat, notes };
+}
+
+// ---------------------------------------------------------------- keeping calories and macros in sync
+
+export interface MacroGrams {
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+/** Share of calories from each macro (fractions summing to 1). */
+export interface Split {
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+/** kcal from grams: 4 per g of protein and carbs, 9 per g of fat. */
+export function macroKcal(m: MacroGrams): number {
+  return m.protein * 4 + m.carbs * 4 + m.fat * 9;
+}
+
+export function splitOf(m: MacroGrams): Split {
+  const t = macroKcal(m);
+  if (t <= 0) return { protein: 0.25, carbs: 0.45, fat: 0.3 };
+  return { protein: (m.protein * 4) / t, carbs: (m.carbs * 4) / t, fat: (m.fat * 9) / t };
+}
+
+/**
+ * Grams for a calorie target at a given split. Carbs take up the rounding so the macros add up
+ * to the target within one gram's worth (≤ 2 kcal).
+ */
+export function macrosFor(calories: number, split: Split): MacroGrams {
+  const protein = Math.round((calories * split.protein) / 4);
+  const fat = Math.round((calories * split.fat) / 9);
+  const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
+  return { protein, carbs, fat };
 }

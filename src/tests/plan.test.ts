@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bmr, buildPlan, goalBlocked, maxPace, type Profile } from "../lib/plan";
+import { bmr, buildPlan, goalBlocked, macroKcal, macrosFor, maxPace, splitOf, type Profile } from "../lib/plan";
 
 const man: Profile = { sex: "male", age: 30, heightCm: 175, weightKg: 80, activity: "moderate", goal: "maintain", pace: 0.5, workoutsPerWeek: 4 };
 
@@ -45,5 +45,19 @@ describe("plan", () => {
     expect(goalBlocked("lose", { age: 25, heightCm: 175, weightKg: 80 })).toBeNull();
     const p = buildPlan({ ...man, age: 16, goal: "lose" });
     expect(p.calories).toBe(buildPlan({ ...man, age: 16 }).calories);
+  });
+});
+
+describe("calories ↔ macros", () => {
+  it("macrosFor keeps the split and adds up to the calories", () => {
+    const split = splitOf({ protein: 150, carbs: 250, fat: 70 });
+    for (const kcal of [1500, 1905, 2200, 2455, 3100]) {
+      const m = macrosFor(kcal, split);
+      expect(Math.abs(macroKcal(m) - kcal)).toBeLessThanOrEqual(2);
+    }
+    const m = macrosFor(2000, split);
+    const s2 = splitOf(m);
+    expect(s2.protein).toBeCloseTo(split.protein, 2);
+    expect(s2.fat).toBeCloseTo(split.fat, 2);
   });
 });

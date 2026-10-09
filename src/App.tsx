@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Apple, BarChart3, Settings as SettingsIcon, CalendarCheck, ClipboardList, Dumbbell, Footprints, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
+import { Apple, BarChart3, Settings as SettingsIcon, CalendarCheck, ClipboardList, Dumbbell, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
 import clsx from "clsx";
 import { useApp, useHydrated } from "./store/app";
 import { useUi, type Page, type Tab } from "./store/ui";
@@ -10,13 +10,12 @@ import { RoutineEditor, RoutinesPage } from "./screens/Routines";
 import { FoodEditor, MyFoods } from "./screens/MyFoods";
 import { LogFood } from "./screens/LogFood";
 import { ActiveWorkout } from "./screens/ActiveWorkout";
-import { ExerciseGoalsPage, ExerciseWeeklyPage, NutritionGoalsPage, NutritionWeeklyPage, StepsPage, WeightPage } from "./screens/MenuPages";
+import { ExerciseGoalsPage, ExerciseWeeklyPage, NutritionGoalsPage, NutritionWeeklyPage, WeightPage } from "./screens/MenuPages";
 import { useStartWorkout } from "./screens/startWorkout";
 import { Onboarding } from "./screens/Onboarding";
 import { WorkoutEditor } from "./screens/WorkoutEditor";
 import { ExerciseProgress } from "./screens/ExerciseProgress";
 import { SettingsPage } from "./screens/Settings";
-import { useStepSync } from "./lib/useStepSync";
 import { Sheet } from "./components/ui";
 import type { Meal } from "./types";
 
@@ -27,7 +26,6 @@ export default function App() {
 }
 
 function Shell() {
-  useStepSync();
   const tab = useUi((s) => s.tab);
   const stack = useUi((s) => s.stack);
   const workoutOpen = useUi((s) => s.workoutOpen);
@@ -78,7 +76,14 @@ function Shell() {
       ))}
       {active && workoutOpen && <ActiveWorkout />}
 
-      {firstRun && <Onboarding onDone={() => setFirstRun(false)} />}
+      {firstRun && (
+        <Onboarding
+          onDone={(next) => {
+            setFirstRun(false);
+            if (next) useUi.getState().push(next);
+          }}
+        />
+      )}
 
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+var(--sa-bottom))] z-[90] flex justify-center">
@@ -113,17 +118,16 @@ function PageView({ page }: { page: Page }) {
       return <ExerciseGoalsPage />;
     case "exerciseWeekly":
       return <ExerciseWeeklyPage />;
-    case "steps":
-      return <StepsPage />;
     case "settings":
       return <SettingsPage />;
     case "onboarding":
       return (
         <Onboarding
           onCancel={() => useUi.getState().pop()}
-          onDone={() => {
+          onDone={(next) => {
             useUi.getState().pop();
-            useUi.getState().showToast("Plan updated");
+            if (next) useUi.getState().push(next);
+            else useUi.getState().showToast("Plan updated");
           }}
         />
       );
@@ -306,7 +310,6 @@ function MenuDrawer() {
           <div className="px-3 pb-1 pt-5 text-xs font-semibold uppercase tracking-wider text-acc">Exercise</div>
           <Item icon={<Target size={20} />} label="Daily goals" page={{ kind: "exerciseGoals" }} />
           <Item icon={<BarChart3 size={20} />} label="Weekly summary" page={{ kind: "exerciseWeekly" }} />
-          <Item icon={<Footprints size={20} />} label="Step tracker" page={{ kind: "steps" }} />
         </div>
         <p className="px-5 pb-6 pt-8 text-xs text-tx3">All data is stored on this device.</p>
       </aside>

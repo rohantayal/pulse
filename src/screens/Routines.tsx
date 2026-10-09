@@ -4,8 +4,9 @@ import { allExercises, useApp } from "../store/app";
 import { useUi } from "../store/ui";
 import type { Routine, RoutineExercise } from "../types";
 import { uid } from "../lib/id";
-import { Button, Confirm, Empty, Field, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
+import { Button, Confirm, Field, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
 import { ExercisePicker } from "./ExercisePicker";
+import { TemplatePicker } from "../components/TemplatePicker";
 import { useStartWorkout } from "./startWorkout";
 
 export function RoutinesPage() {
@@ -16,6 +17,7 @@ export function RoutinesPage() {
   const start = useStartWorkout();
   const [menuFor, setMenuFor] = useState<Routine | null>(null);
   const [confirmDel, setConfirmDel] = useState<Routine | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
 
   const names = useMemo(() => new Map(allExercises(custom).map((e) => [e.id, e.name])), [custom]);
   const lastDone = useMemo(() => {
@@ -46,7 +48,20 @@ export function RoutinesPage() {
 
         <div className="mb-2 mt-6 px-1 text-[13px] font-semibold uppercase tracking-wider text-tx2">My routines ({routines.length})</div>
         {routines.length === 0 ? (
-          <Empty icon={<ClipboardList size={26} />} title="No routines yet" text="Build a routine once and start it with one tap." />
+          <div>
+            <p className="mb-3 px-1 text-sm text-tx2">No routines yet. Start from a template, or tap + to build your own.</p>
+            <TemplatePicker selected={picked} onToggle={(k) => setPicked((x) => (x.includes(k) ? x.filter((y) => y !== k) : [...x, k]))} />
+            <Button
+              className="mt-3 w-full"
+              disabled={picked.length === 0}
+              onClick={() => {
+                useApp.getState().addTemplateRoutines(picked);
+                setPicked([]);
+              }}
+            >
+              {picked.length ? `Add ${picked.length} routine${picked.length > 1 ? "s" : ""}` : "Pick a template"}
+            </Button>
+          </div>
         ) : (
           <div className="space-y-3">
             {routines.map((r) => {

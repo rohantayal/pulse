@@ -16,7 +16,6 @@ export type Page =
   | { kind: "weight" }
   | { kind: "exerciseGoals" }
   | { kind: "exerciseWeekly" }
-  | { kind: "steps" }
   | { kind: "onboarding" }
   | { kind: "settings" };
 

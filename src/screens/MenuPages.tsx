@@ -3,8 +3,6 @@ import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { useApp, useUnit } from "../store/app";
 import { fromUnit } from "../lib/units";
-import { isNative } from "../lib/platform";
-import { syncStepsNow } from "../lib/useStepSync";
 import { buildPlan, goalBlocked, maxPace, type GoalType } from "../lib/plan";
 import { useUi } from "../store/ui";
 import type { ExerciseGoals, NutritionGoals } from "../types";
@@ -12,7 +10,7 @@ import { addDays, dayNum, dowShort, fromKey, longDate, monthShort, todayKey, wee
 import { fmt } from "../lib/format";
 import { BAR_COLOR, DEFAULT_OVER_ALLOWANCE, GOOD_COLOR, calorieStatus, macroCalories, statusColor } from "../lib/nutrition";
 import { dayStats } from "../lib/day";
-import { exercisesVolume } from "../lib/workout";
+import { completedSets, exercisesVolume } from "../lib/workout";
 import { Button, Card, Field, NumberInput, PageHeader, ProgressBar, Screen, SectionTitle, inputCls } from "../components/ui";
 import { BarChart, LineChart } from "../components/Charts";
 
@@ -263,9 +261,9 @@ function useWeek() {
 
 export function NutritionWeeklyPage() {
   const pop = useUi((s) => s.pop);
-  const { foodLog, workouts, steps, weights, nutritionGoals: goals } = useApp();
+  const { foodLog, workouts, nutritionGoals: goals } = useApp();
   const { days, nav } = useWeek();
-  const stats = useMemo(() => days.map((d) => ({ d, s: dayStats(d, { foodLog, workouts, steps, weights }) })), [days.join(), foodLog, workouts, steps, weights]);
+  const stats = useMemo(() => days.map((d) => ({ d, s: dayStats(d, { foodLog, workouts }) })), [days.join(), foodLog, workouts]);
   const logged = stats.filter((x) => x.s.food.calories > 0);
   const n = Math.max(1, logged.length);
   const avg = {
@@ -498,19 +496,6 @@ export function ExerciseGoalsPage() {
             </div>
           </Field>
         </Card>
-        <Card className="space-y-4">
-          <div className="text-sm font-semibold">Steps</div>
-          <Field label="Daily step goal">
-            <NumberInput value={g.steps} onChange={num("steps")} suffix="steps" step="1" />
-          </Field>
-          <div className="flex gap-2">
-            {[6000, 8000, 10000, 12000].map((s) => (
-              <button key={s} onClick={() => setG({ ...g, steps: s })} className={clsx("flex-1 rounded-lg py-1.5 text-xs font-medium", g.steps === s ? "bg-acc text-white" : "bg-surf2 text-tx2")}>
-                {fmt(s / 1000)}k
-              </button>
-            ))}
-          </div>
-        </Card>
         <Button
           className="w-full"
           onClick={() => {
@@ -531,14 +516,13 @@ export function ExerciseGoalsPage() {
 export function ExerciseWeeklyPage() {
   const pop = useUi((s) => s.pop);
   const { unit, show } = useUnit();
-  const { foodLog, workouts, steps, weights, exerciseGoals: goals } = useApp();
+  const { foodLog, workouts, exerciseGoals: goals } = useApp();
   const { days, nav } = useWeek();
-  const stats = useMemo(() => days.map((d) => ({ d, s: dayStats(d, { foodLog, workouts, steps, weights }) })), [days.join(), foodLog, workouts, steps, weights]);
+  const stats = useMemo(() => days.map((d) => ({ d, s: dayStats(d, { foodLog, workouts }) })), [days.join(), foodLog, workouts]);
   const weekWorkouts = stats.flatMap((x) => x.s.workouts);
   const totalMs = weekWorkouts.reduce((a, w) => a + (w.endedAt - w.startedAt), 0);
   const volume = weekWorkouts.reduce((a, w) => a + exercisesVolume(w.exercises), 0);
   const burned = stats.reduce((a, x) => a + x.s.exercise, 0);
-  const totalSteps = stats.reduce((a, x) => a + x.s.steps, 0);
 
   return (
     <Screen>
@@ -578,8 +562,8 @@ export function ExerciseWeeklyPage() {
             </div>
           </Card>
           <Card className="text-center">
-            <div className="text-xs text-tx2">Steps</div>
-            <div className="text-[15px] font-bold tabular-nums">{fmt(totalSteps)}</div>
+            <div className="text-xs text-tx2">Sets</div>
+            <div className="text-[15px] font-bold tabular-nums">{fmt(weekWorkouts.reduce((a, w) => a + completedSets(w.exercises), 0))}</div>
           </Card>
         </div>
 
@@ -609,121 +593,6 @@ export function ExerciseWeeklyPage() {
               </div>
             ))}
           </Card>
-        )}
-      </div>
-    </Screen>
-  );
-}
-
-// ---------------------------------------------------------------- Steps
-
-export function StepsPage() {
-  const { pop, push, showToast } = useUi();
-  const health = useApp((s) => s.healthSteps);
-  const healthOn = health.enabled;
-  const steps = useApp((s) => s.steps);
-  const goal = useApp((s) => s.exerciseGoals.steps);
-  const setSteps = useApp((s) => s.setSteps);
-  const [range, setRange] = useState<7 | 30>(7);
-  const [date, setDate] = useState(todayKey());
-  const [val, setVal] = useState<number | null>(steps.find((s) => s.date === todayKey())?.steps ?? null);
-
-  const days = useMemo(() => Array.from({ length: range }, (_, i) => addDays(todayKey(), i - range + 1)), [range]);
-  const data = days.map((d) => ({ key: d, label: range === 7 ? dowShort(d) : String(dayNum(d)), value: steps.find((s) => s.date === d)?.steps ?? 0 }));
-  const logged = data.filter((d) => d.value > 0);
-  const avg = logged.length ? logged.reduce((a, d) => a + d.value, 0) / logged.length : 0;
-  const hit = data.filter((d) => d.value >= goal).length;
-  const today = data[data.length - 1].value;
-
-  return (
-    <Screen>
-      <PageHeader title="Step tracker" onBack={pop} />
-      <div className="px-3 pb-10">
-        <Card>
-          <div className="flex items-end justify-between">
-            <div>
-              <div className="text-xs text-tx2">Today</div>
-              <div className="text-3xl font-bold tabular-nums">{fmt(today)}</div>
-              <div className="text-xs text-tx3">of {fmt(goal)} steps</div>
-            </div>
-            <div className="text-right text-xs text-tx2">
-              <div>
-                Avg <b className="text-tx">{fmt(avg)}</b>
-              </div>
-              <div>
-                Goal hit <b className="text-tx">{hit}</b>/{range} days
-              </div>
-            </div>
-          </div>
-          <ProgressBar value={today} max={goal} color={C.steps} className="mt-3 h-2" />
-        </Card>
-
-        <Card className="mt-3">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-sm font-semibold">Steps</div>
-            <div className="flex gap-1 rounded-lg bg-surf2 p-0.5 text-xs">
-              {([7, 30] as const).map((r) => (
-                <button key={r} onClick={() => setRange(r)} className={clsx("rounded-md px-2 py-1 font-medium", range === r ? "bg-surf3 text-tx" : "text-tx2")}>
-                  {r}D
-                </button>
-              ))}
-            </div>
-          </div>
-          <BarChart data={data} goal={goal} color={C.steps} unit="steps" />
-        </Card>
-
-        {healthOn ? (
-          <Card className="mt-3 flex items-center gap-3">
-            <div className="flex-1 text-sm text-tx2">
-              Steps come from Health Connect automatically{health.lastSync ? ` · updated ${new Date(health.lastSync).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}.
-            </div>
-            <Button
-              variant="secondary"
-              className="h-9 text-sm"
-              onClick={async () => {
-                try {
-                  await syncStepsNow();
-                  showToast("Steps updated");
-                } catch {
-                  showToast("Couldn't reach Health Connect");
-                }
-              }}
-            >
-              Sync now
-            </Button>
-          </Card>
-        ) : (
-        <>
-        <SectionTitle>Log steps</SectionTitle>
-        <Card className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Date">
-              <input
-                type="date"
-                className={inputCls}
-                value={date}
-                max={todayKey()}
-                onChange={(e) => {
-                  if (!e.target.value) return;
-                  setDate(e.target.value);
-                  setVal(steps.find((s) => s.date === e.target.value)?.steps ?? null);
-                }}
-              />
-            </Field>
-            <Field label="Steps">
-              <NumberInput value={val} onChange={setVal} step="1" />
-            </Field>
-          </div>
-          <Button className="w-full" disabled={val == null || val < 0} onClick={() => setSteps(date, val ? Math.round(val) : null)}>
-            Save
-          </Button>
-          {isNative && (
-            <button onClick={() => push({ kind: "settings" })} className="w-full text-center text-xs text-acc">
-              Get steps automatically — connect Health Connect in Settings
-            </button>
-          )}
-        </Card>
-        </>
         )}
       </div>
     </Screen>

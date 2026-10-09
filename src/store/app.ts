@@ -12,7 +12,6 @@ import type {
   NutritionGoals,
   PrKind,
   Routine,
-  StepEntry,
   WeightEntry,
   Workout,
   WorkoutExercise,
@@ -22,6 +21,7 @@ import type {
 import { DEFAULT_MEALS } from "../types";
 import { PRELOADED_FOODS } from "../data/foods";
 import { PRELOADED_EXERCISES } from "../data/exercises";
+import { ROUTINE_TEMPLATES } from "../data/routineTemplates";
 import { todayKey } from "../lib/date";
 import { uid } from "../lib/id";
 import { bestsFromSets, detectPRs, exerciseBests, recomputePrs } from "../lib/workout";
@@ -40,15 +40,10 @@ export interface AppState {
   onboarded: boolean;
   checklistDismissed: boolean;
   /** Save the profile and the (possibly edited) targets from onboarding, and log today's weight. */
-  completeOnboarding: (profile: Profile, targets: { nutrition: NutritionGoals; steps: number }) => void;
+  completeOnboarding: (profile: Profile, targets: { nutrition: NutritionGoals }) => void;
   dismissChecklist: () => void;
   updateProfile: (patch: Partial<Profile>) => void;
 
-  /** Steps from Health Connect (Android). */
-  healthSteps: { enabled: boolean; lastSync?: number };
-  setHealthSteps: (h: { enabled: boolean; lastSync?: number }) => void;
-  /** Bulk-set steps from Health Connect: one value per day. */
-  importSteps: (days: { date: string; steps: number }[]) => void;
   lastBackupAt?: number;
   markBackedUp: () => void;
   /** Replace all data with a backup's contents. */
@@ -61,7 +56,6 @@ export interface AppState {
   nutritionGoals: NutritionGoals;
   exerciseGoals: ExerciseGoals;
   weights: WeightEntry[];
-  steps: StepEntry[];
 
   customExercises: Exercise[];
   routines: Routine[];
@@ -86,7 +80,6 @@ export interface AppState {
   setNutritionGoals: (g: NutritionGoals) => void;
   setExerciseGoals: (g: ExerciseGoals) => void;
   setWeight: (date: string, kg: number | null) => void;
-  setSteps: (date: string, steps: number | null) => void;
 
   // exercise library
   saveCustomExercise: (e: Omit<Exercise, "id">) => Exercise;
@@ -94,6 +87,8 @@ export interface AppState {
   // routines
   saveRoutine: (r: Omit<Routine, "id" | "createdAt"> & { id?: string }) => Routine;
   deleteRoutine: (id: string) => void;
+  /** Add starter routines by template key (see data/routineTemplates). */
+  addTemplateRoutines: (keys: string[]) => void;
 
   // active workout
   startWorkout: (routine?: Routine) => void;
@@ -127,38 +122,6 @@ export function allExercises(custom: Exercise[]): Exercise[] {
 
 function emptySet(): WorkoutSet {
   return { id: uid(), kg: null, reps: null, done: false };
-}
-
-function seedRoutines(): Routine[] {
-  const mk = (name: string, ids: [string, number, string][]): Routine => ({
-    id: uid(),
-    name,
-    createdAt: Date.now(),
-    exercises: ids.map(([exerciseId, sets, repRange]) => ({ id: uid(), exerciseId: `pre:${exerciseId}`, sets, repRange })),
-  });
-  return [
-    mk("Push", [
-      ["bench-press-bb", 4, "6-8"],
-      ["incline-bench-db", 3, "8-10"],
-      ["shoulder-press-db", 3, "8-10"],
-      ["lateral-raise-db", 3, "12-15"],
-      ["tricep-pushdown", 3, "10-12"],
-    ]),
-    mk("Pull", [
-      ["deadlift-bb", 3, "5"],
-      ["pull-up", 3, "6-10"],
-      ["seated-cable-row", 3, "8-12"],
-      ["face-pull", 3, "12-15"],
-      ["bicep-curl-db", 3, "10-12"],
-    ]),
-    mk("Legs", [
-      ["squat-bb", 4, "6-8"],
-      ["rdl-bb", 3, "8-10"],
-      ["leg-press", 3, "10-12"],
-      ["leg-curl-seated", 3, "10-12"],
-      ["calf-raise-standing", 4, "12-15"],
-    ]),
-  ];
 }
 
 function mapActive(state: AppState, fn: (exs: WorkoutExercise[]) => WorkoutExercise[]): Partial<AppState> {
@@ -198,7 +161,6 @@ const RESTORE_DEFAULTS = {
   foodLog: [],
   recentFoodIds: [],
   weights: [],
-  steps: [],
   customExercises: [],
   workouts: [],
 };
@@ -213,7 +175,7 @@ export const useApp = create<AppState>()(
       setUnit: (unit) => set({ unit }),
       onboarded: false,
       checklistDismissed: false,
-      completeOnboarding: (profile, { nutrition, steps }) =>
+      completeOnboarding: (profile, { nutrition }) =>
         set((s) => {
           const today = todayKey();
           return {
@@ -221,19 +183,11 @@ export const useApp = create<AppState>()(
             onboarded: true,
             checklistDismissed: false,
             nutritionGoals: { ...s.nutritionGoals, ...nutrition },
-            exerciseGoals: { ...s.exerciseGoals, steps, workoutsPerWeek: profile.workoutsPerWeek },
+            exerciseGoals: { ...s.exerciseGoals, workoutsPerWeek: profile.workoutsPerWeek },
             weights: [...s.weights.filter((w) => w.date !== today), { date: today, kg: profile.weightKg }].sort((a, b) => a.date.localeCompare(b.date)),
           };
         }),
       dismissChecklist: () => set({ checklistDismissed: true }),
-      healthSteps: { enabled: false },
-      setHealthSteps: (healthSteps) => set({ healthSteps }),
-      importSteps: (days) =>
-        set((s) => {
-          const map = new Map(s.steps.map((x) => [x.date, x.steps]));
-          for (const d of days) if (d.steps > 0) map.set(d.date, Math.round(d.steps));
-          return { steps: [...map].map(([date, steps]) => ({ date, steps })).sort((a, b) => a.date.localeCompare(b.date)) };
-        }),
       lastBackupAt: undefined,
       markBackedUp: () => set({ lastBackupAt: Date.now() }),
       restoreData: (data) => set({ ...RESTORE_DEFAULTS, ...data, active: (data.active as ActiveWorkout | null | undefined) ?? null, selectedDate: todayKey() }),
@@ -244,12 +198,11 @@ export const useApp = create<AppState>()(
       foodLog: [],
       recentFoodIds: [],
       nutritionGoals: { calories: 2200, carbs: 250, protein: 140, fat: 70 },
-      exerciseGoals: { calories: 400, minutes: 45, steps: 10000, workoutsPerWeek: 4 },
+      exerciseGoals: { calories: 400, minutes: 45, workoutsPerWeek: 4 },
       weights: [],
-      steps: [],
-
+    
       customExercises: [],
-      routines: seedRoutines(),
+      routines: [],
       workouts: [],
       active: null,
       settings: { prSound: true, restTimer: 90, autofillPrevious: true },
@@ -315,11 +268,6 @@ export const useApp = create<AppState>()(
           const rest = s.weights.filter((w) => w.date !== date);
           return { weights: kg == null ? rest : [...rest, { date, kg }].sort((a, b) => a.date.localeCompare(b.date)) };
         }),
-      setSteps: (date, steps) =>
-        set((s) => {
-          const rest = s.steps.filter((w) => w.date !== date);
-          return { steps: steps == null ? rest : [...rest, { date, steps }].sort((a, b) => a.date.localeCompare(b.date)) };
-        }),
 
       saveCustomExercise: (input) => {
         const ex: Exercise = { ...input, id: `custom:${uid()}`, custom: true };
@@ -339,6 +287,18 @@ export const useApp = create<AppState>()(
         }));
         return routine;
       },
+      addTemplateRoutines: (keys) =>
+        set((s) => ({
+          routines: [
+            ...s.routines,
+            ...ROUTINE_TEMPLATES.filter((t) => keys.includes(t.key)).map((t) => ({
+              id: uid(),
+              name: t.name,
+              createdAt: Date.now(),
+              exercises: t.exercises.map(([id, sets, repRange]) => ({ id: uid(), exerciseId: `pre:${id}`, sets, repRange })),
+            })),
+          ],
+        })),
       deleteRoutine: (id) => set((s) => ({ routines: s.routines.filter((r) => r.id !== id) })),
 
       startWorkout: (routine) =>
@@ -469,8 +429,11 @@ export const useApp = create<AppState>()(
       storage: createJSONStorage(() => appStorage),
       // The selected day is per-session; always open on today.
       partialize: (s) => {
-        const { selectedDate: _ignored, ...rest } = s;
+        // Step counting was removed: drop any old step data still sitting in saved state.
+        const { selectedDate: _ignored, steps: _s, healthSteps: _h, ...rest } = s as AppState & { steps?: unknown; healthSteps?: unknown };
         void _ignored;
+        void _s;
+        void _h;
         return rest;
       },
     },
