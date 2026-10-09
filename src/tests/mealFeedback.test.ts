@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mealFeedback } from "../lib/mealFeedback";
 
-const base = { goal: 2200, restOfDay: 0, budget: 2200, allowance: 100, snack: false };
+const base = { goal: 2200, snack: false };
 
 describe("mealFeedback", () => {
   it("calls out a 4-slice pizza (1,140 kcal) as a very heavy meal", () => {
@@ -42,10 +42,13 @@ describe("mealFeedback", () => {
     expect(f.tone).toBe("good");
   });
 
-  it("warns when the meal pushes the day over goal + allowance", () => {
-    const f = mealFeedback({ ...base, restOfDay: 1900, meal: { calories: 600, carbs: 70, protein: 30, fat: 20 } })!;
-    expect(f.tone).toBe("bad");
-    expect(f.notes[0].text).toContain("300 kcal over");
+  it("judges each meal on its own — no day totals are involved", () => {
+    // Same lunch, same verdict, however heavy the rest of the day is: the function
+    // only ever sees this meal and the daily goal.
+    const lunch = { calories: 700, carbs: 80, protein: 35, fat: 26 };
+    expect(mealFeedback({ ...base, meal: lunch })).toEqual(mealFeedback({ ...base, meal: { ...lunch } }));
+    expect(mealFeedback({ ...base, meal: lunch })!.tone).toBe("good");
+    expect(JSON.stringify(mealFeedback({ ...base, meal: lunch }))).not.toMatch(/today|left/i);
   });
 
   it("returns nothing for an empty meal", () => {

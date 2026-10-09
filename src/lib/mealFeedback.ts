@@ -31,18 +31,17 @@ export function isSnackMeal(mealId: string, label: string): boolean {
   return mealId === "snacks" || /snack/i.test(label);
 }
 
+/**
+ * Judges a meal only by itself — its size against your daily goal and its macro balance.
+ * Other meals never change this verdict; how the whole day went is shown on the day cards.
+ */
 export function mealFeedback(opts: {
   meal: Macros;
-  /** Daily calorie goal (without exercise) */
+  /** Daily calorie goal */
   goal: number;
   snack: boolean;
-  /** Everything else eaten that day, excluding this meal */
-  restOfDay: number;
-  /** Goal + exercise calories */
-  budget: number;
-  allowance: number;
 }): Feedback | null {
-  const { meal, goal, snack, restOfDay, budget, allowance } = opts;
+  const { meal, goal, snack } = opts;
   if (meal.calories <= 0) return null;
 
   const share = goal > 0 ? meal.calories / goal : 0;
@@ -71,7 +70,7 @@ export function mealFeedback(opts: {
     icon = "🛑";
     notes.push({
       tone: "bad",
-      text: `${fmt(meal.calories)} kcal is ${pct(share)} of your day in one sitting. A main meal is usually 25–35% — keep the rest of today light.`,
+      text: `${fmt(meal.calories)} kcal is ${pct(share)} of your day in one sitting. A main meal is usually 25–35%.`,
     });
   } else if (share > 0.38) {
     tone = "warn";
@@ -108,24 +107,11 @@ export function mealFeedback(opts: {
     notes.push({ tone: "good", text: "Macros are in a healthy range." });
   }
 
-  // ---- the day as a whole
-  const after = restOfDay + meal.calories;
-  const over = after - budget;
-  if (over > allowance) {
-    tone = worst(tone, "bad");
-    notes.push({ tone: "bad", text: `Takes today ${fmt(over)} kcal over your goal.` });
-  } else if (budget - after >= 0) {
-    notes.push({ tone: "ok", text: `${fmt(budget - after)} kcal left today after this.` });
-  }
-
   // Title follows the overall verdict when macros, not size, were the problem
   if (title === "Balanced meal" || title === "Sensible snack") {
     if (tone === "warn") {
       title = snack ? "Snack could be better" : "Could be more balanced";
       icon = "⚠️";
-    } else if (tone === "bad") {
-      title = "Over today's goal";
-      icon = "🛑";
     } else if (notes.some((n) => n.text.startsWith("Great protein"))) {
       title = "Solid meal";
       icon = "💪";

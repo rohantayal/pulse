@@ -1,17 +1,22 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Activity as ActivityIcon, ChevronLeft, Dumbbell, Flame, Scale, Sparkles, Target, Trophy, Utensils } from "lucide-react";
+import { Activity as ActivityIcon, Check, ChevronLeft, Dumbbell, Flame, PieChart, Target, Trophy, Utensils } from "lucide-react";
 import clsx from "clsx";
 import { useApp } from "../store/app";
-import { ACTIVITY, bmi, buildPlan, goalBlocked, maxPace, type Activity, type GoalType, type Profile, type Sex } from "../lib/plan";
+import { buildPlan, type Profile, type Sex } from "../lib/plan";
 import { fmt } from "../lib/format";
 import { Button, NumberInput, inputCls } from "../components/ui";
 
-type Step = "welcome" | "about" | "activity" | "goal" | "plan";
-const STEPS: Step[] = ["welcome", "about", "activity", "goal", "plan"];
+// Kept deliberately short: only what the app needs to set your targets — no judging questions.
+type Step = "welcome" | "about" | "plan" | "done";
+const STEPS: Step[] = ["welcome", "about", "plan", "done"];
 
 const DEFAULT: Profile = { sex: "male", age: 25, heightCm: 170, weightKg: 70, activity: "light", goal: "maintain", pace: 0.5, workoutsPerWeek: 3 };
 
-/** First-run setup: a few questions → personalised calorie, macro and step targets. */
+/**
+ * First-run setup: Welcome → About you → Your plan → Done.
+ * The plan is a plain estimate of what your body uses in a day (lightly active, maintain);
+ * everything on it is editable, and goals can be changed later in Menu → Daily goals.
+ */
 export function Onboarding({ onDone, onCancel }: { onDone: () => void; onCancel?: () => void }) {
   const existing = useApp((s) => s.profile);
   const [step, setStep] = useState<Step>(existing ? "about" : "welcome");
@@ -27,19 +32,19 @@ export function Onboarding({ onDone, onCancel }: { onDone: () => void; onCancel?
   const set = (patch: Partial<Profile>) => setP((x) => ({ ...x, ...patch }));
 
   const aboutValid = age != null && age >= 13 && age <= 100 && weight != null && weight >= 30 && weight <= 300 && heightCm != null && heightCm >= 120 && heightCm <= 230;
-  const full: Profile = { ...p, age: age ?? p.age, weightKg: weight ?? p.weightKg, heightCm: heightCm ?? p.heightCm };
+  const full: Profile = { ...p, age: age ?? p.age, weightKg: weight ?? p.weightKg, heightCm: heightCm ?? p.heightCm, activity: "light", goal: "maintain" };
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-bg animate-fade-in">
       <div className="mx-auto flex h-full w-full max-w-md flex-col">
-        {step !== "welcome" && (
+        {step !== "welcome" && step !== "done" && (
           <header className="pt-safe">
             <div className="flex h-14 items-center gap-2 px-2">
               <button onClick={back} className="flex h-10 w-10 items-center justify-center rounded-full active:bg-surf2" aria-label="Back">
                 <ChevronLeft size={24} />
               </button>
               <div className="flex flex-1 gap-1.5 pr-4">
-                {STEPS.slice(1).map((s, idx) => (
+                {STEPS.slice(1, -1).map((s, idx) => (
                   <div key={s} className={clsx("h-1 flex-1 rounded-full transition-colors", idx < i ? "bg-acc" : "bg-surf3")} />
                 ))}
               </div>
@@ -63,12 +68,11 @@ export function Onboarding({ onDone, onCancel }: { onDone: () => void; onCancel?
               setHeightUnit={setHeightUnit}
             />
           )}
-          {step === "activity" && <ActivityStep value={p.activity} onChange={(activity) => set({ activity })} />}
-          {step === "goal" && <GoalStep p={full} set={set} />}
-          {step === "plan" && <PlanStep p={full} onDone={onDone} />}
+          {step === "plan" && <PlanStep p={full} onSaved={next} />}
+          {step === "done" && <DoneStep name={full.name} onDone={onDone} />}
         </div>
 
-        {step !== "plan" && (
+        {(step === "welcome" || step === "about") && (
           <div className="pb-safe fixed inset-x-0 bottom-0 mx-auto max-w-md bg-gradient-to-t from-bg via-bg to-transparent px-5 pt-6">
             <Button className="mb-5 h-12 w-full text-base" onClick={next} disabled={step === "about" && !aboutValid}>
               {step === "welcome" ? "Get started" : "Continue"}
@@ -93,7 +97,7 @@ function Welcome() {
   const features = [
     { icon: <Utensils size={20} />, title: "Log meals by typing", text: "“2 roti, dal, 150g paneer” — calories and macros in seconds." },
     { icon: <Dumbbell size={20} />, title: "Track every set", text: "Routines, previous numbers, rest timer and golden PRs." },
-    { icon: <Sparkles size={20} />, title: "Honest feedback", text: "Praise when a meal earns it, a nudge when it doesn't." },
+    { icon: <PieChart size={20} />, title: "Your day at a glance", text: "Calories and macros, meal by meal." },
   ];
   return (
     <div className="pt-safe flex min-h-full flex-col justify-center py-10">
@@ -107,7 +111,7 @@ function Welcome() {
         <br />
         Eat smart.
       </h1>
-      <p className="mt-3 text-[16px] text-tx2">Pulse brings your workouts and your nutrition into one place. Let's set up a plan that fits you — it takes about a minute.</p>
+      <p className="mt-3 text-[16px] text-tx2">Pulse brings your workouts and your nutrition into one place. Three quick questions and you're in.</p>
       <div className="mt-8 space-y-4">
         {features.map((f) => (
           <div key={f.title} className="flex gap-4">
@@ -234,155 +238,45 @@ function AboutStep(props: {
   );
 }
 
-function ActivityStep({ value, onChange }: { value: Activity; onChange: (a: Activity) => void }) {
-  return (
-    <div>
-      <Title sub="Not counting workouts — just a normal day.">How active is your day?</Title>
-      <div className="space-y-2">
-        {(Object.keys(ACTIVITY) as Activity[]).map((a) => (
-          <Choice key={a} selected={value === a} onClick={() => onChange(a)}>
-            <div className="flex items-center gap-3">
-              <ActivityIcon size={20} className={value === a ? "text-acc" : "text-tx3"} />
-              <div>
-                <div className="font-semibold">{ACTIVITY[a].label}</div>
-                <div className="text-sm text-tx2">{ACTIVITY[a].hint}</div>
-              </div>
-            </div>
-          </Choice>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const GOALS: { id: GoalType; label: string; hint: string; icon: ReactNode }[] = [
-  { id: "lose", label: "Lose fat", hint: "Eat a little less than you burn", icon: <Flame size={20} /> },
-  { id: "maintain", label: "Stay fit", hint: "Keep your weight, build habits", icon: <Scale size={20} /> },
-  { id: "gain", label: "Build muscle", hint: "Eat a little more and train hard", icon: <Dumbbell size={20} /> },
-];
-
-function GoalStep({ p, set }: { p: Profile; set: (x: Partial<Profile>) => void }) {
-  const max = maxPace(p.goal, p.weightKg);
-  const paces = (p.goal === "lose" ? [0.25, 0.5, 0.75, 1] : [0.25, 0.5]).filter((x) => x <= max);
-  return (
-    <div>
-      <Title sub="You can change this any time.">What's your goal?</Title>
-      <div className="space-y-2">
-        {GOALS.map((g) => {
-          const blocked = goalBlocked(g.id, p);
-          return (
-            <Choice key={g.id} selected={p.goal === g.id} disabled={!!blocked} onClick={() => set({ goal: g.id, pace: g.id === "lose" ? 0.5 : 0.25 })}>
-              <div className="flex items-center gap-3">
-                <span className={p.goal === g.id ? "text-acc" : "text-tx3"}>{g.icon}</span>
-                <div>
-                  <div className="font-semibold">{g.label}</div>
-                  <div className="text-sm text-tx2">{blocked ?? g.hint}</div>
-                </div>
-              </div>
-            </Choice>
-          );
-        })}
-      </div>
-
-      {p.goal !== "maintain" && (
-        <div className="mt-6">
-          <Label>Pace</Label>
-          <div className="grid grid-cols-4 gap-2">
-            {paces.map((x) => (
-              <button
-                key={x}
-                onClick={() => set({ pace: x })}
-                className={clsx("rounded-xl py-2.5 text-sm font-semibold", p.pace === x ? "bg-acc text-white" : "bg-surf2 text-tx2")}
-              >
-                {x} kg
-              </button>
-            ))}
-          </div>
-          <div className="mt-1.5 text-xs text-tx3">
-            per week ·{" "}
-            {p.goal === "lose"
-              ? p.pace <= 0.5
-                ? "steady and easy to stick to"
-                : "faster — expect more hunger"
-              : p.pace <= 0.25
-                ? "lean gains, less fat"
-                : "faster gains, some fat"}
-          </div>
-        </div>
-      )}
-
-      <div className="mt-6">
-        <Label>Workouts per week</Label>
-        <div className="grid grid-cols-7 gap-1.5">
-          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-            <button
-              key={n}
-              onClick={() => set({ workoutsPerWeek: n })}
-              className={clsx("rounded-xl py-2.5 text-sm font-semibold", p.workoutsPerWeek === n ? "bg-acc text-white" : "bg-surf2 text-tx2")}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PlanStep({ p, onDone }: { p: Profile; onDone: () => void }) {
+function PlanStep({ p, onSaved }: { p: Profile; onSaved: () => void }) {
   const plan = useMemo(() => buildPlan(p), [p]);
   const [calories, setCalories] = useState<number | null>(plan.calories);
   const [protein, setProtein] = useState<number | null>(plan.protein);
   const [carbs, setCarbs] = useState<number | null>(plan.carbs);
   const [fat, setFat] = useState<number | null>(plan.fat);
   const [steps, setSteps] = useState<number | null>(plan.steps);
-  const diff = plan.calories - plan.tdee;
-  const b = bmi(p);
   const valid = [calories, protein, carbs, fat, steps].every((v) => v != null && v >= 0) && (calories ?? 0) >= 800;
 
-  function start() {
+  function save() {
     if (!valid) return;
     useApp.getState().completeOnboarding(p, {
       nutrition: { calories: calories!, protein: protein!, carbs: carbs!, fat: fat! },
       steps: steps!,
     });
-    onDone();
+    onSaved();
   }
 
   return (
     <div>
-      <Title sub="Based on your answers. Tweak anything you like.">{p.name ? `${p.name}, here's your plan` : "Here's your plan"}</Title>
+      <Title sub="What your body uses in a typical day. Change anything you like.">{p.name ? `${p.name}, your plan` : "Your plan"}</Title>
 
       <div className="rounded-3xl bg-acc/10 p-5 text-center">
         <div className="text-sm font-medium text-tx2">Daily calories</div>
         <div className="mt-1 text-[44px] font-bold leading-none tabular-nums text-acc">{fmt(calories ?? 0)}</div>
-        <div className="mt-2 text-sm text-tx2">
-          {diff < -20 ? `${fmt(-diff)} kcal under your burn` : diff > 20 ? `${fmt(diff)} kcal above your burn` : "matches what you burn"}
-        </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-          <Explain label="Resting burn" value={`${fmt(plan.bmr)}`} />
-          <Explain label="With activity" value={`${fmt(plan.tdee)}`} />
-          <Explain label={p.goal === "maintain" ? "Goal" : p.goal === "lose" ? `−${p.pace} kg/wk` : `+${p.pace} kg/wk`} value={`${fmt(plan.calories)}`} />
-        </div>
+        <div className="mt-2 text-sm text-tx2">Based on your age, height and weight</div>
       </div>
-
-      {plan.notes.map((n) => (
-        <p key={n} className="mt-3 rounded-xl bg-gold/10 px-3 py-2 text-sm text-gold">
-          {n}
-        </p>
-      ))}
 
       <div className="mt-5 space-y-3 rounded-2xl bg-surf p-4">
         <Row icon={<Target size={18} />} label="Calories" hint="kcal / day">
           <NumberInput value={calories} onChange={(v) => setCalories(v == null ? null : Math.round(v))} step="1" />
         </Row>
-        <Row icon={<Trophy size={18} />} label="Protein" hint={`${(protein && p.weightKg ? protein / p.weightKg : 0).toFixed(1)} g per kg`}>
+        <Row icon={<Trophy size={18} />} label="Protein" hint="g / day">
           <NumberInput value={protein} onChange={(v) => setProtein(v == null ? null : Math.round(v))} suffix="g" step="1" />
         </Row>
-        <Row icon={<Utensils size={18} />} label="Carbs" hint="the rest of your energy">
+        <Row icon={<Utensils size={18} />} label="Carbs" hint="g / day">
           <NumberInput value={carbs} onChange={(v) => setCarbs(v == null ? null : Math.round(v))} suffix="g" step="1" />
         </Row>
-        <Row icon={<Flame size={18} />} label="Fat" hint="~27% of calories">
+        <Row icon={<Flame size={18} />} label="Fat" hint="g / day">
           <NumberInput value={fat} onChange={(v) => setFat(v == null ? null : Math.round(v))} suffix="g" step="1" />
         </Row>
         <Row icon={<ActivityIcon size={18} />} label="Steps" hint="per day">
@@ -390,26 +284,30 @@ function PlanStep({ p, onDone }: { p: Profile; onDone: () => void }) {
         </Row>
       </div>
 
-      <p className="mt-4 text-xs leading-relaxed text-tx3">
-        BMI {b.toFixed(1)}. Calories use the Mifflin–St Jeor equation; protein is set at {p.goal === "lose" ? "2.0" : p.goal === "gain" ? "1.8" : "1.6"} g per kg
-        of body weight. These are estimates — watch your weight for 2–3 weeks and adjust. Not medical advice; if you have a health condition, check
-        with a doctor or dietitian.
-      </p>
+      <p className="mt-4 text-xs leading-relaxed text-tx3">A starting point, not a rule. You can change these any time in Menu → Daily goals.</p>
 
       <div className="pb-safe fixed inset-x-0 bottom-0 mx-auto max-w-md bg-gradient-to-t from-bg via-bg to-transparent px-5 pt-6">
-        <Button className="mb-5 h-12 w-full text-base" disabled={!valid} onClick={start}>
-          Start my plan
+        <Button className="mb-5 h-12 w-full text-base" disabled={!valid} onClick={save}>
+          Continue
         </Button>
       </div>
     </div>
   );
 }
 
-function Explain({ label, value }: { label: string; value: string }) {
+function DoneStep({ name, onDone }: { name?: string; onDone: () => void }) {
   return (
-    <div className="rounded-xl bg-bg/40 px-2 py-2">
-      <div className="font-semibold tabular-nums text-tx">{value}</div>
-      <div className="text-tx3">{label}</div>
+    <div className="pt-safe flex min-h-full flex-col items-center justify-center py-10 text-center">
+      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-good/15 text-good animate-pr-pop">
+        <Check size={40} strokeWidth={3} />
+      </div>
+      <h1 className="mt-6 text-[28px] font-bold">{name ? `You're all set, ${name}` : "You're all set"}</h1>
+      <p className="mt-2 text-[15px] text-tx2">Log a meal by typing what you ate, or tap + to start a workout.</p>
+      <div className="pb-safe fixed inset-x-0 bottom-0 mx-auto max-w-md px-5">
+        <Button className="mb-5 h-12 w-full text-base" onClick={onDone}>
+          Let's go
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import type { Macros, NutritionGoals } from "../types";
 import { fmt } from "../lib/format";
-import { BAR_COLOR, DEFAULT_OVER_ALLOWANCE, calorieStatus, macroSplit, statusColor } from "../lib/nutrition";
+import { BAR_COLOR, GOOD_COLOR, OVER_COLOR, macroSplit } from "../lib/nutrition";
 import { mealFeedback, type Tone } from "../lib/mealFeedback";
 
 const TONE_TEXT: Record<Tone, string> = {
@@ -20,43 +20,35 @@ const DOT: Record<Tone, string> = { good: "✓", ok: "•", warn: "!", bad: "✕
 
 /**
  * Calories | Carbs | Protein | Fat for one meal, plus honest feedback.
- * Calories: the meal's share of the day's budget (green/red by how the day ends up).
+ * Calories: the meal's share of the daily goal, green unless the meal itself is heavy.
  * Macros: share of the meal's calories from each macro — adds up to 100%.
  * Used both while logging and on Today, so it looks the same in both places.
+ * Everything here depends only on this meal — other meals never change it.
  */
 export function MealSummary({
   mealId,
   label,
   meal,
-  restOfDay,
   goals,
-  exercise,
   className,
 }: {
   mealId: string;
   label: string;
   meal: Macros;
-  /** Calories eaten that day outside this meal */
-  restOfDay: number;
   goals: NutritionGoals;
-  exercise: number;
   className?: string;
 }) {
-  const allowance = goals.overAllowance ?? DEFAULT_OVER_ALLOWANCE;
-  const budget = goals.calories + exercise;
-  const status = calorieStatus(restOfDay + meal.calories, budget, allowance);
   const split = macroSplit(meal);
   const feedback = mealFeedback({
     meal,
     goal: goals.calories,
     snack: mealId === "snacks" || /snack/i.test(label),
-    restOfDay,
-    budget,
-    allowance,
   });
+  // Calories go red only when this meal on its own is too heavy
+  const kcalColor = feedback?.title.startsWith("Very heavy") || feedback?.title.startsWith("Heavy") ? OVER_COLOR : GOOD_COLOR;
 
   const cols = [
-    { label: "Calories", value: meal.calories, unit: "kcal", pct: budget > 0 ? (meal.calories / budget) * 100 : 0, note: "of day", color: statusColor(status) },
+    { label: "Calories", value: meal.calories, unit: "kcal", pct: goals.calories > 0 ? (meal.calories / goals.calories) * 100 : 0, note: "of day", color: kcalColor },
     { label: "Carbs", value: meal.carbs, unit: "g", pct: split.carbs, note: "of meal", color: BAR_COLOR },
     { label: "Protein", value: meal.protein, unit: "g", pct: split.protein, note: "of meal", color: BAR_COLOR },
     { label: "Fat", value: meal.fat, unit: "g", pct: split.fat, note: "of meal", color: BAR_COLOR },

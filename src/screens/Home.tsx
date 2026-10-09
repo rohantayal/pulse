@@ -157,9 +157,7 @@ export function Home() {
             key={m.id}
             meal={m}
             entries={dayEntries.filter((e) => e.meal === m.id)}
-            restOfDay={stats.food.calories - sumEntries(dayEntries.filter((e) => e.meal === m.id)).calories}
             goals={goals}
-            exercise={stats.exercise}
             onAdd={() => push({ kind: "logFood", meal: m.id, date })}
             onEdit={setEditEntry}
             onMenu={() => setMealMenu(m)}
@@ -323,15 +321,11 @@ function MealBlock({
   onAdd,
   onEdit,
   onMenu,
-  restOfDay,
   goals,
-  exercise,
 }: {
   meal: MealDef;
   entries: FoodLogEntry[];
-  restOfDay: number;
   goals: NutritionGoals;
-  exercise: number;
   onAdd: () => void;
   onEdit: (e: FoodLogEntry) => void;
   onMenu: () => void;
@@ -371,9 +365,7 @@ function MealBlock({
             mealId={meal.id}
             label={meal.label}
             meal={total}
-            restOfDay={restOfDay}
             goals={goals}
-            exercise={exercise}
             className="border-b border-line px-4 py-4"
           />
         )}

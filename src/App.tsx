@@ -24,7 +24,9 @@ export default function App() {
   const active = useApp((s) => s.active);
   // First launch: nothing set up and nothing logged yet. People who already use the app can
   // open the same setup from Menu → Set up my plan.
-  const firstRun = useApp((s) => !s.onboarded && s.foodLog.length === 0 && s.workouts.length === 0);
+  const firstRunNow = useApp((s) => !s.onboarded && s.foodLog.length === 0 && s.workouts.length === 0);
+  // Decided once at launch, so setup stays open through its "Done" screen after the plan is saved.
+  const [firstRun, setFirstRun] = useState(firstRunNow);
 
   // Android/browser back button closes the top page instead of leaving the app.
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function App() {
       ))}
       {active && workoutOpen && <ActiveWorkout />}
 
-      {firstRun && <Onboarding onDone={() => useUi.getState().showToast("You're all set — log your first meal!")} />}
+      {firstRun && <Onboarding onDone={() => setFirstRun(false)} />}
 
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[90] flex justify-center">

@@ -10,7 +10,6 @@ import { ZERO, add, amountLabel, scale, toServings } from "../lib/nutrition";
 import { bestMatch, gramsPerServing, parseFoodText, rankFoods, suggestions, type Unit } from "../lib/foodText";
 import { sumEntries } from "../lib/nutrition";
 import { MealSummary } from "../components/MealSummary";
-import { dayStats } from "../lib/day";
 import { Button, Field, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
 import { AddMealSheet } from "../components/AddMealSheet";
 
@@ -46,10 +45,6 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
   const foodLog = useApp((s) => s.foodLog);
   const goals = useApp((s) => s.nutritionGoals);
   const dayEntries = useMemo(() => foodLog.filter((e) => e.date === date), [foodLog, date]);
-  const workouts = useApp((s) => s.workouts);
-  const steps = useApp((s) => s.steps);
-  const weights = useApp((s) => s.weights);
-  const exercise = useMemo(() => dayStats(date, { foodLog: [], workouts, steps, weights }).exercise, [date, workouts, steps, weights]);
   const [meal, setMeal] = useState<Meal>(initialMeal);
   const [text, setText] = useState("");
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
@@ -197,7 +192,6 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
           // The card covers the whole meal: what's already logged in it plus what you're adding now.
           const existing = dayEntries.filter((e) => e.meal === meal);
           const mealTotal = add(sumEntries(existing), total);
-          const restOfDay = sumEntries(dayEntries.filter((e) => e.meal !== meal)).calories;
           return (
             <div className="mt-3 rounded-2xl bg-surf p-4">
               <div className="mb-3 text-[15px] font-semibold">
@@ -207,7 +201,7 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
                   {existing.length > 0 && ` (${existing.length} already logged)`}
                 </span>
               </div>
-              <MealSummary mealId={meal} label={mealLabel} meal={mealTotal} restOfDay={restOfDay} goals={goals} exercise={exercise} />
+              <MealSummary mealId={meal} label={mealLabel} meal={mealTotal} goals={goals} />
             </div>
           );
         })()}
