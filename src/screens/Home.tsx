@@ -3,7 +3,7 @@ import { CalendarDays, ChevronRight, Dumbbell, Footprints, Menu, MoreHorizontal,
 import clsx from "clsx";
 import { isCustomMeal, useApp } from "../store/app";
 import { useUi } from "../store/ui";
-import type { FoodLogEntry, MealDef } from "../types";
+import type { FoodLogEntry, MealDef, NutritionGoals } from "../types";
 import { addDays, dayNum, dowShort, friendlyDate, longDate, todayKey, weekDays, formatDuration } from "../lib/date";
 import { useSwipe } from "../lib/useSwipe";
 import { dayStats } from "../lib/day";
@@ -14,6 +14,7 @@ import { Button, Card, Confirm, NumberInput, ProgressBar, Sheet, SectionTitle, i
 import { MonthCalendar } from "../components/MonthCalendar";
 import { FoodEntrySheet } from "./LogFood";
 import { AddMealSheet } from "../components/AddMealSheet";
+import { MealSummary } from "../components/MealSummary";
 
 export function Home() {
   const date = useApp((s) => s.selectedDate);
@@ -147,6 +148,9 @@ export function Home() {
             key={m.id}
             meal={m}
             entries={dayEntries.filter((e) => e.meal === m.id)}
+            restOfDay={stats.food.calories - sumEntries(dayEntries.filter((e) => e.meal === m.id)).calories}
+            goals={goals}
+            exercise={stats.exercise}
             onAdd={() => push({ kind: "logFood", meal: m.id, date })}
             onEdit={setEditEntry}
             onMenu={() => setMealMenu(m)}
@@ -310,9 +314,15 @@ function MealBlock({
   onAdd,
   onEdit,
   onMenu,
+  restOfDay,
+  goals,
+  exercise,
 }: {
   meal: MealDef;
   entries: FoodLogEntry[];
+  restOfDay: number;
+  goals: NutritionGoals;
+  exercise: number;
   onAdd: () => void;
   onEdit: (e: FoodLogEntry) => void;
   onMenu: () => void;
@@ -347,13 +357,16 @@ function MealBlock({
             </button>
           );
         })}
-        {entries.length > 1 && (
-          <div className="flex items-center justify-between border-b border-line bg-surf2/50 px-4 py-2 text-xs">
-            <span className="font-semibold text-tx2">Meal total</span>
-            <span className="tabular-nums text-tx2">
-              C {fmt(total.carbs)}g · P {fmt(total.protein)}g · F {fmt(total.fat)}g · <b className="text-tx">{fmt(total.calories)} kcal</b>
-            </span>
-          </div>
+        {entries.length > 0 && (
+          <MealSummary
+            mealId={meal.id}
+            label={meal.label}
+            meal={total}
+            restOfDay={restOfDay}
+            goals={goals}
+            exercise={exercise}
+            className="border-b border-line px-4 py-4"
+          />
         )}
         <button onClick={onAdd} className="flex w-full items-center gap-2 px-4 py-3 text-sm font-semibold text-acc active:bg-surf2">
           <Plus size={16} /> Add food

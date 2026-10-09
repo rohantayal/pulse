@@ -3,12 +3,13 @@ import { AlertCircle, ChevronDown, Plus, Search, Sparkles, Trash2, X } from "luc
 import clsx from "clsx";
 import { allFoods, useApp } from "../store/app";
 import { useUi } from "../store/ui";
-import type { Food, FoodLogEntry, Macros, Meal, NutritionGoals } from "../types";
+import type { Food, FoodLogEntry, Macros, Meal } from "../types";
 import { friendlyDate } from "../lib/date";
 import { fmt } from "../lib/format";
 import { ZERO, add, amountLabel, scale, toServings } from "../lib/nutrition";
 import { bestMatch, gramsPerServing, parseFoodText, rankFoods, suggestions, type Unit } from "../lib/foodText";
-import { BAR_COLOR, calorieStatus, macroSplit, statusColor, sumEntries } from "../lib/nutrition";
+import { sumEntries } from "../lib/nutrition";
+import { MealSummary } from "../components/MealSummary";
 import { dayStats } from "../lib/day";
 import { Button, Field, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
 import { AddMealSheet } from "../components/AddMealSheet";
@@ -44,7 +45,7 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
   const recentIds = useApp((s) => s.recentFoodIds);
   const foodLog = useApp((s) => s.foodLog);
   const goals = useApp((s) => s.nutritionGoals);
-  const eatenToday = useMemo(() => sumEntries(foodLog.filter((e) => e.date === date)), [foodLog, date]);
+  const dayEntries = useMemo(() => foodLog.filter((e) => e.date === date), [foodLog, date]);
   const workouts = useApp((s) => s.workouts);
   const steps = useApp((s) => s.steps);
   const weights = useApp((s) => s.weights);
@@ -192,7 +193,24 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
         )}
 
         {/* Meal total */}
-        {ready.length > 0 && <MealTotalCard label={mealLabel} count={ready.length} meal={total} before={eatenToday} goals={goals} exercise={exercise} />}
+        {ready.length > 0 && (() => {
+          // The card covers the whole meal: what's already logged in it plus what you're adding now.
+          const existing = dayEntries.filter((e) => e.meal === meal);
+          const mealTotal = add(sumEntries(existing), total);
+          const restOfDay = sumEntries(dayEntries.filter((e) => e.meal !== meal)).calories;
+          return (
+            <div className="mt-3 rounded-2xl bg-surf p-4">
+              <div className="mb-3 text-[15px] font-semibold">
+                {mealLabel} total{" "}
+                <span className="text-sm font-normal text-tx2">
+                  · {existing.length + ready.length} item{existing.length + ready.length > 1 ? "s" : ""}
+                  {existing.length > 0 && ` (${existing.length} already logged)`}
+                </span>
+              </div>
+              <MealSummary mealId={meal} label={mealLabel} meal={mealTotal} restOfDay={restOfDay} goals={goals} exercise={exercise} />
+            </div>
+          );
+        })()}
 
         {/* Recent foods for one-tap adding */}
         {recent.length > 0 && (
@@ -393,79 +411,6 @@ function Mac({ label, value }: { label: string; value: number }) {
       <span className="text-tx2">{label}</span>
       <b className="font-semibold">{fmt(value, 1)}g</b>
     </span>
-  );
-}
-
-/**
- * Calories | Carbs | Protein | Fat for the meal being logged.
- * Calories: this meal's share of the daily calorie goal (green/red by how the day ends up).
- * Macros: share of this meal's calories that comes from each macro — they add up to 100%.
- */
-function MealTotalCard({
-  label,
-  count,
-  meal,
-  before,
-  goals,
-  exercise,
-}: {
-  label: string;
-  count: number;
-  meal: Macros;
-  before: Macros;
-  goals: NutritionGoals;
-  exercise: number;
-}) {
-  const budget = goals.calories + exercise;
-  const after = before.calories + meal.calories;
-  const status = calorieStatus(after, budget, goals.overAllowance);
-  const kcalPct = budget > 0 ? (meal.calories / budget) * 100 : 0;
-  const split = macroSplit(meal);
-  const left = budget - after;
-  const proteinHit = before.protein < goals.protein && before.protein + meal.protein >= goals.protein;
-  const message = proteinHit
-    ? { icon: "🎯", text: "This meal hits your protein goal!" }
-    : status === "over"
-      ? { icon: "⚠️", text: `Puts you ${fmt(-left)} kcal over today's goal` }
-      : split.protein >= 30
-        ? { icon: "💪", text: `Protein-rich meal — ${Math.round(split.protein)}% of its calories` }
-        : { icon: "✨", text: left >= 0 ? `${fmt(left)} kcal left today after this` : `Within your allowance — ${fmt(-left)} kcal over goal` };
-
-  const cols = [
-    { label: "Calories", value: meal.calories, unit: "kcal", pct: kcalPct, note: "of day", color: statusColor(status) },
-    { label: "Carbs", value: meal.carbs, unit: "g", pct: split.carbs, note: "of meal", color: BAR_COLOR },
-    { label: "Protein", value: meal.protein, unit: "g", pct: split.protein, note: "of meal", color: BAR_COLOR },
-    { label: "Fat", value: meal.fat, unit: "g", pct: split.fat, note: "of meal", color: BAR_COLOR },
-  ];
-
-  return (
-    <div className="mt-3 rounded-2xl bg-surf p-4">
-      <div className="text-[15px] font-semibold">
-        {label} total <span className="text-sm font-normal text-tx2">· {count} item{count > 1 ? "s" : ""}</span>
-      </div>
-
-      <div className="mt-3 grid grid-cols-4 gap-3">
-        {cols.map((c) => (
-          <div key={c.label} className="min-w-0">
-            <div className="truncate text-[11px] font-medium text-tx2">{c.label}</div>
-            <div className="mt-1 text-[22px] font-bold leading-none tabular-nums" style={c.label === "Calories" ? { color: c.color } : undefined}>
-              {fmt(c.value, c.unit === "g" && c.value < 10 ? 1 : 0)}
-            </div>
-            <div className="text-[10px] text-tx3">{c.unit}</div>
-            <div className="mt-2 h-1 overflow-hidden rounded-full bg-surf3">
-              <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.min(100, c.pct)}%`, background: c.color }} />
-            </div>
-            <div className="mt-1.5 text-[13px] font-semibold tabular-nums">{Math.round(c.pct)}%</div>
-            <div className="text-[10px] text-tx3">{c.note}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-3 flex items-center gap-2 rounded-xl bg-surf2 px-3 py-2 text-sm">
-        <span>{message.icon}</span>
-        <span className="text-tx2">{message.text}</span>
-      </div>
-    </div>
   );
 }
 
