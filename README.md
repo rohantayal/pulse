@@ -39,5 +39,12 @@ npm run build      # typecheck + production build
 - Previous workouts: history grouped by month, detail view, save as routine, delete.
 
 **Nutrition**
+- Log a meal by typing what you ate: `2 roti, 1 bowl dal, 150g paneer, banana`. Each part is matched
+  to a food (Hindi names like chapati/dahi/anda and small typos work). Every item shows its own calories
+  and macros, plus a total for the whole meal. Tap an item to pick a different food.
+- No match → create the food right there; it's attached to that item when you save it.
+- Amounts in servings or grams (switch per item; the amount converts). Grams need the serving weight,
+  which built-in foods have and custom foods can set.
+- Add your own meal sections (e.g. Pre-workout) next to Breakfast/Lunch/Dinner/Snacks; rename any, delete your own.
 - ~120 preloaded foods (Indian staples, proteins, dairy, grains, fruit, veg, snacks, drinks) with per-serving macros
-- Create/edit/delete your own foods; recent foods list; search
+- Create/edit/delete your own foods in My Foods

@@ -5,8 +5,8 @@ export type Tab = "history" | "routines" | "today" | "foods";
 
 /** Full-screen pages pushed over the tabs. */
 export type Page =
-  | { kind: "foodSearch"; meal: Meal; date: string }
-  | { kind: "foodEditor"; foodId?: string }
+  | { kind: "logFood"; meal: Meal; date: string }
+  | { kind: "foodEditor"; foodId?: string; name?: string }
   | { kind: "routineEditor"; routineId?: string }
   | { kind: "workoutDetail"; workoutId: string }
   | { kind: "nutritionGoals" }

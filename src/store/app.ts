@@ -7,6 +7,7 @@ import type {
   Food,
   FoodLogEntry,
   Meal,
+  MealDef,
   NutritionGoals,
   PrKind,
   Routine,
@@ -17,15 +18,18 @@ import type {
   WorkoutSet,
   WorkoutSettings,
 } from "../types";
+import { DEFAULT_MEALS } from "../types";
 import { PRELOADED_FOODS } from "../data/foods";
 import { PRELOADED_EXERCISES } from "../data/exercises";
 import { todayKey } from "../lib/date";
 import { uid } from "../lib/id";
 import { bestsFromSets, detectPRs, exerciseBests } from "../lib/workout";
+import { gramsPerServing } from "../lib/foodText";
 
 export interface AppState {
   selectedDate: string;
 
+  meals: MealDef[];
   customFoods: Food[];
   foodLog: FoodLogEntry[];
   recentFoodIds: string[];
@@ -44,8 +48,13 @@ export interface AppState {
   setDate: (date: string) => void;
 
   // nutrition
-  addFoodEntry: (date: string, meal: Meal, food: Food, servings: number) => void;
-  updateFoodEntry: (id: string, patch: Partial<Pick<FoodLogEntry, "servings" | "meal">>) => void;
+  /** Log a food. Pass `grams` when the amount was entered by weight (servings is derived). */
+  addFoodEntry: (date: string, meal: Meal, food: Food, amount: { servings: number; grams?: number }) => void;
+  updateFoodEntry: (id: string, patch: Partial<Pick<FoodLogEntry, "servings" | "meal" | "grams">>) => void;
+  addMeal: (label: string) => MealDef;
+  renameMeal: (id: Meal, label: string) => void;
+  /** Removes a meal section; any foods logged under it move to Snacks. */
+  deleteMeal: (id: Meal) => void;
   removeFoodEntry: (id: string) => void;
   saveCustomFood: (food: Omit<Food, "id"> & { id?: string }) => Food;
   deleteCustomFood: (id: string) => void;
@@ -158,6 +167,7 @@ export const useApp = create<AppState>()(
     (set, get) => ({
       selectedDate: todayKey(),
 
+      meals: DEFAULT_MEALS,
       customFoods: [],
       foodLog: [],
       recentFoodIds: [],
@@ -174,7 +184,7 @@ export const useApp = create<AppState>()(
 
       setDate: (date) => set({ selectedDate: date }),
 
-      addFoodEntry: (date, meal, food, servings) =>
+      addFoodEntry: (date, meal, food, { servings, grams }) =>
         set((s) => ({
           foodLog: [
             ...s.foodLog,
@@ -186,6 +196,8 @@ export const useApp = create<AppState>()(
               name: food.brand ? `${food.name} (${food.brand})` : food.name,
               serving: food.serving,
               servings,
+              grams,
+              gramsPerServing: gramsPerServing(food),
               per: { calories: food.calories, carbs: food.carbs, protein: food.protein, fat: food.fat },
               createdAt: Date.now(),
             },
@@ -194,6 +206,17 @@ export const useApp = create<AppState>()(
         })),
       updateFoodEntry: (id, patch) =>
         set((s) => ({ foodLog: s.foodLog.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
+      addMeal: (label) => {
+        const meal: MealDef = { id: `meal:${uid()}`, label: label.trim() };
+        set((s) => ({ meals: [...s.meals, meal] }));
+        return meal;
+      },
+      renameMeal: (id, label) => set((s) => ({ meals: s.meals.map((m) => (m.id === id ? { ...m, label: label.trim() } : m)) })),
+      deleteMeal: (id) =>
+        set((s) => (!isCustomMeal(id) ? {} : {
+          meals: s.meals.filter((m) => m.id !== id),
+          foodLog: s.foodLog.map((e) => (e.meal === id ? { ...e, meal: "snacks" } : e)),
+        })),
       removeFoodEntry: (id) => set((s) => ({ foodLog: s.foodLog.filter((e) => e.id !== id) })),
 
       saveCustomFood: (input) => {
@@ -380,3 +403,8 @@ export const useApp = create<AppState>()(
     },
   ),
 );
+
+/** Only meals the user added can be deleted; the four defaults can just be renamed. */
+export function isCustomMeal(id: string): boolean {
+  return id.startsWith("meal:");
+}

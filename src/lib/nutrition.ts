@@ -39,3 +39,20 @@ export function latestWeight(weights: WeightEntry[], onOrBefore: string): number
   for (const w of weights) if (w.date <= onOrBefore && (!found || w.date > found.date)) found = w;
   return found?.kg;
 }
+
+/** Servings from an amount typed as servings or grams. Returns null when grams can't be converted. */
+export function toServings(qty: number, unit: "serving" | "g", gramsPerServing?: number): number | null {
+  if (unit === "serving") return qty;
+  return gramsPerServing ? qty / gramsPerServing : null;
+}
+
+/** "150 g" for weight entries, "2 × 1 medium (40 g)" for servings. */
+export function amountLabel(e: { servings: number; grams?: number; serving: string }): string {
+  if (e.grams != null) return `${round(e.grams, 1)} g`;
+  return `${round(e.servings, 2)} × ${e.serving}`;
+}
+
+function round(n: number, dp: number) {
+  const f = 10 ** dp;
+  return Math.round(n * f) / f;
+}

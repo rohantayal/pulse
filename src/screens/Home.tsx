@@ -1,18 +1,19 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronRight, Dumbbell, Footprints, Menu, Plus, Scale, Share2 } from "lucide-react";
+import { CalendarDays, ChevronRight, Dumbbell, Footprints, Menu, MoreHorizontal, Pencil, Plus, Scale, Share2, Trash2 } from "lucide-react";
 import clsx from "clsx";
-import { useApp } from "../store/app";
+import { isCustomMeal, useApp } from "../store/app";
 import { useUi } from "../store/ui";
-import { MEALS, type FoodLogEntry, type Meal } from "../types";
+import type { FoodLogEntry, MealDef } from "../types";
 import { addDays, dayNum, dowShort, friendlyDate, longDate, todayKey, weekDays, formatDuration } from "../lib/date";
 import { useSwipe } from "../lib/useSwipe";
 import { dayStats } from "../lib/day";
-import { entryMacros, sumEntries } from "../lib/nutrition";
+import { amountLabel, entryMacros, sumEntries } from "../lib/nutrition";
 import { fmt } from "../lib/format";
 import { completedSets, exercisesVolume } from "../lib/workout";
-import { Button, Card, NumberInput, ProgressBar, Sheet, SectionTitle } from "../components/ui";
+import { Button, Card, Confirm, NumberInput, ProgressBar, Sheet, SectionTitle, inputCls } from "../components/ui";
 import { MonthCalendar } from "../components/MonthCalendar";
-import { FoodEntrySheet } from "./FoodSearch";
+import { FoodEntrySheet } from "./LogFood";
+import { AddMealSheet } from "../components/AddMealSheet";
 
 export function Home() {
   const date = useApp((s) => s.selectedDate);
@@ -23,12 +24,15 @@ export function Home() {
   const weights = useApp((s) => s.weights);
   const goals = useApp((s) => s.nutritionGoals);
   const exGoals = useApp((s) => s.exerciseGoals);
+  const meals = useApp((s) => s.meals);
   const { setMenu, push, showToast } = useUi();
 
   const [calOpen, setCalOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<FoodLogEntry | null>(null);
   const [stepsOpen, setStepsOpen] = useState(false);
   const [weightOpen, setWeightOpen] = useState(false);
+  const [addingMeal, setAddingMeal] = useState(false);
+  const [mealMenu, setMealMenu] = useState<MealDef | null>(null);
   const [slide, setSlide] = useState<"l" | "r" | null>(null);
 
   const stats = useMemo(() => dayStats(date, { foodLog, workouts, steps, weights }), [date, foodLog, workouts, steps, weights]);
@@ -127,16 +131,22 @@ export function Home() {
         </Card>
 
         {/* Meals */}
-        {MEALS.map((m) => (
+        {meals.map((m) => (
           <MealBlock
             key={m.id}
-            meal={m.id}
-            label={m.label}
+            meal={m}
             entries={dayEntries.filter((e) => e.meal === m.id)}
-            onAdd={() => push({ kind: "foodSearch", meal: m.id, date })}
+            onAdd={() => push({ kind: "logFood", meal: m.id, date })}
             onEdit={setEditEntry}
+            onMenu={() => setMealMenu(m)}
           />
         ))}
+        <button
+          onClick={() => setAddingMeal(true)}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-line py-3 text-sm font-semibold text-tx2 active:bg-surf"
+        >
+          <Plus size={16} /> Add meal
+        </button>
 
         {/* Exercise */}
         <SectionTitle>Exercise</SectionTitle>
@@ -209,6 +219,8 @@ export function Home() {
         </Button>
       </Sheet>
 
+      <AddMealSheet open={addingMeal} onClose={() => setAddingMeal(false)} />
+      {mealMenu && <MealMenuSheet meal={mealMenu} onClose={() => setMealMenu(null)} />}
       {editEntry && <FoodEntrySheet entry={editEntry} onClose={() => setEditEntry(null)} />}
       <QuickNumberSheet
         open={stepsOpen}
@@ -287,21 +299,32 @@ function Macro({ label, now, goal, color }: { label: string; now: number; goal: 
 
 function MealBlock({
   meal,
-  label,
   entries,
   onAdd,
   onEdit,
+  onMenu,
 }: {
-  meal: Meal;
-  label: string;
+  meal: MealDef;
   entries: FoodLogEntry[];
   onAdd: () => void;
   onEdit: (e: FoodLogEntry) => void;
+  onMenu: () => void;
 }) {
   const total = sumEntries(entries);
   return (
-    <div data-meal={meal}>
-      <SectionTitle right={<span className="text-xs font-semibold text-tx2">{fmt(total.calories)} kcal</span>}>{label}</SectionTitle>
+    <div data-meal={meal.id}>
+      <SectionTitle
+        right={
+          <span className="flex items-center gap-1">
+            <span className="text-xs font-semibold text-tx2">{fmt(total.calories)} kcal</span>
+            <button onClick={onMenu} className="-mr-1 rounded-full p-1 text-tx3 active:bg-surf2" aria-label={`${meal.label} options`}>
+              <MoreHorizontal size={16} />
+            </button>
+          </span>
+        }
+      >
+        {meal.label}
+      </SectionTitle>
       <Card className="p-0">
         {entries.map((e) => {
           const m = entryMacros(e);
@@ -310,18 +333,67 @@ function MealBlock({
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{e.name}</div>
                 <div className="truncate text-xs text-tx2">
-                  {fmt(e.servings, 2)} × {e.serving} · C {fmt(m.carbs)} · P {fmt(m.protein)} · F {fmt(m.fat)}
+                  {amountLabel(e)} · C {fmt(m.carbs)} · P {fmt(m.protein)} · F {fmt(m.fat)}
                 </div>
               </div>
               <div className="text-sm font-semibold tabular-nums">{fmt(m.calories)}</div>
             </button>
           );
         })}
+        {entries.length > 1 && (
+          <div className="flex items-center justify-between border-b border-line bg-surf2/50 px-4 py-2 text-xs">
+            <span className="font-semibold text-tx2">Meal total</span>
+            <span className="tabular-nums text-tx2">
+              C {fmt(total.carbs)}g · P {fmt(total.protein)}g · F {fmt(total.fat)}g · <b className="text-tx">{fmt(total.calories)} kcal</b>
+            </span>
+          </div>
+        )}
         <button onClick={onAdd} className="flex w-full items-center gap-2 px-4 py-3 text-sm font-semibold text-acc active:bg-surf2">
           <Plus size={16} /> Add food
         </button>
       </Card>
     </div>
+  );
+}
+
+function MealMenuSheet({ meal, onClose }: { meal: MealDef; onClose: () => void }) {
+  const [name, setName] = useState(meal.label);
+  const [confirm, setConfirm] = useState(false);
+  const custom = isCustomMeal(meal.id);
+  return (
+    <Sheet open onClose={onClose} title={meal.label}>
+      <div className="flex gap-2">
+        <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} aria-label="Meal name" />
+        <Button
+          disabled={!name.trim() || name.trim() === meal.label}
+          onClick={() => {
+            useApp.getState().renameMeal(meal.id, name);
+            onClose();
+          }}
+        >
+          <Pencil size={16} /> Rename
+        </Button>
+      </div>
+      {custom ? (
+        <Button variant="danger" className="mt-3 w-full" onClick={() => setConfirm(true)}>
+          <Trash2 size={16} /> Delete meal
+        </Button>
+      ) : (
+        <p className="mt-3 text-xs text-tx3">Breakfast, Lunch, Dinner and Snacks can be renamed but not deleted.</p>
+      )}
+      <Confirm
+        open={confirm}
+        title={`Delete “${meal.label}”?`}
+        message="Foods already logged in this meal move to Snacks."
+        confirmLabel="Delete meal"
+        destructive
+        onCancel={() => setConfirm(false)}
+        onConfirm={() => {
+          useApp.getState().deleteMeal(meal.id);
+          onClose();
+        }}
+      />
+    </Sheet>
   );
 }
 

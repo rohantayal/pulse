@@ -1,8 +1,14 @@
 // ---------- Nutrition ----------
 
-export type Meal = "breakfast" | "lunch" | "dinner" | "snacks";
+/** Meal section id. The four defaults use these ids; meals you add get "meal:<uuid>". */
+export type Meal = string;
 
-export const MEALS: { id: Meal; label: string }[] = [
+export interface MealDef {
+  id: Meal;
+  label: string;
+}
+
+export const DEFAULT_MEALS: MealDef[] = [
   { id: "breakfast", label: "Breakfast" },
   { id: "lunch", label: "Lunch" },
   { id: "dinner", label: "Dinner" },
@@ -23,6 +29,8 @@ export interface Food extends Macros {
   brand?: string;
   /** Human readable serving, e.g. "1 roti (40 g)" */
   serving: string;
+  /** Grams in one serving. Optional — otherwise read from `serving` ("… (40 g)"). */
+  grams?: number;
   category?: string;
   custom?: boolean;
 }
@@ -36,6 +44,10 @@ export interface FoodLogEntry {
   name: string;
   serving: string;
   servings: number;
+  /** Set when the amount was entered by weight; `servings` is then grams / grams-per-serving. */
+  grams?: number;
+  /** Grams in one serving, snapshotted at log time (when known) */
+  gramsPerServing?: number;
   /** Per-serving macros snapshot */
   per: Macros;
   createdAt: number;

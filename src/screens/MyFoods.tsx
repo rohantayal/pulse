@@ -8,7 +8,8 @@ import type { Food } from "../types";
 import { macroCalories } from "../lib/nutrition";
 import { fmt } from "../lib/format";
 import { Button, Confirm, Empty, Field, PageHeader, Screen, inputCls } from "../components/ui";
-import { FoodRow } from "./FoodSearch";
+import { FoodRow } from "./LogFood";
+import { gramsPerServing } from "../lib/foodText";
 
 export function MyFoods() {
   const custom = useApp((s) => s.customFoods);
@@ -93,10 +94,11 @@ export function MyFoods() {
 
 const blank: Omit<Food, "id"> = { name: "", brand: "", serving: "1 serving", calories: 0, carbs: 0, protein: 0, fat: 0 };
 
-export function FoodEditor({ foodId }: { foodId?: string }) {
+export function FoodEditor({ foodId, name }: { foodId?: string; name?: string }) {
   const { pop, showToast } = useUi();
   const existing = useApp((s) => s.customFoods.find((f) => f.id === foodId));
-  const [f, setF] = useState<Omit<Food, "id">>(existing ?? blank);
+  const [f, setF] = useState<Omit<Food, "id">>(existing ?? { ...blank, name: name ?? "" });
+  const parsedGrams = gramsPerServing({ serving: f.serving });
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const set = <K extends keyof Food>(k: K, v: Food[K]) => setF((x) => ({ ...x, [k]: v }));
@@ -123,14 +125,28 @@ export function FoodEditor({ foodId }: { foodId?: string }) {
       />
       <div className="space-y-4 px-4 pb-10">
         <Field label="Name">
-          <input className={inputCls} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Mom's Poha" autoFocus />
+          <input className={inputCls} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Mom's Poha" autoFocus={!name} />
         </Field>
         <Field label="Brand (optional)">
           <input className={inputCls} value={f.brand ?? ""} onChange={(e) => set("brand", e.target.value)} placeholder="e.g. Amul" />
         </Field>
-        <Field label="Serving size">
-          <input className={inputCls} value={f.serving} onChange={(e) => set("serving", e.target.value)} placeholder="e.g. 1 bowl (200 g)" />
-        </Field>
+        <div className="grid grid-cols-[1fr_7.5rem] gap-3">
+          <Field label="Serving size">
+            <input className={inputCls} value={f.serving} onChange={(e) => set("serving", e.target.value)} placeholder="e.g. 1 bowl" autoFocus={!!name} />
+          </Field>
+          <Field label="Weight (g)">
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              className={inputCls}
+              value={f.grams ?? ""}
+              placeholder={parsedGrams ? String(parsedGrams) : "optional"}
+              onChange={(e) => set("grams", e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)))}
+            />
+          </Field>
+        </div>
+        <p className="-mt-2 text-xs text-tx3">Add the weight of one serving so you can also log this food in grams.</p>
 
         <div className="rounded-2xl bg-surf p-4">
           <div className="mb-3 text-sm font-semibold">Nutrition per serving</div>

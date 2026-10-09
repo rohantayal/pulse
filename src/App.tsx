@@ -8,12 +8,12 @@ import { Home } from "./screens/Home";
 import { HistoryPage, WorkoutDetail } from "./screens/History";
 import { RoutineEditor, RoutinesPage } from "./screens/Routines";
 import { FoodEditor, MyFoods } from "./screens/MyFoods";
-import { FoodSearch } from "./screens/FoodSearch";
+import { LogFood } from "./screens/LogFood";
 import { ActiveWorkout } from "./screens/ActiveWorkout";
 import { ExerciseGoalsPage, ExerciseWeeklyPage, NutritionGoalsPage, NutritionWeeklyPage, StepsPage, WeightPage } from "./screens/MenuPages";
 import { useStartWorkout } from "./screens/startWorkout";
 import { Sheet } from "./components/ui";
-import { MEALS, type Meal } from "./types";
+import type { Meal } from "./types";
 
 export default function App() {
   const tab = useUi((s) => s.tab);
@@ -38,8 +38,6 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  const top = stack[stack.length - 1];
-
   return (
     <div className="mx-auto h-full max-w-md">
       <main className="no-scrollbar h-full overflow-y-auto">
@@ -54,7 +52,13 @@ export default function App() {
       <AddSheet />
       <MenuDrawer />
 
-      {top && <PageView key={stack.length} page={top} />}
+      {/* Every page in the stack stays mounted (so e.g. Log food keeps what you typed while you
+          create a food), each on its own layer so nothing from a lower page shows through. */}
+      {stack.map((p, i) => (
+        <div key={i} className="relative" style={{ zIndex: 30 + i }}>
+          <PageView page={p} />
+        </div>
+      ))}
       {active && workoutOpen && <ActiveWorkout />}
 
       {toast && (
@@ -68,10 +72,10 @@ export default function App() {
 
 function PageView({ page }: { page: Page }) {
   switch (page.kind) {
-    case "foodSearch":
-      return <FoodSearch meal={page.meal} date={page.date} />;
+    case "logFood":
+      return <LogFood meal={page.meal} date={page.date} />;
     case "foodEditor":
-      return <FoodEditor foodId={page.foodId} />;
+      return <FoodEditor foodId={page.foodId} name={page.name} />;
     case "routineEditor":
       return <RoutineEditor routineId={page.routineId} />;
     case "workoutDetail":
@@ -150,6 +154,7 @@ function AddSheet() {
   const open = useUi((s) => s.addOpen);
   const { setAdd, push } = useUi();
   const routines = useApp((s) => s.routines);
+  const meals = useApp((s) => s.meals);
   const date = useApp((s) => s.selectedDate);
   const active = useApp((s) => s.active);
   const start = useStartWorkout();
@@ -201,11 +206,11 @@ function AddSheet() {
       )}
       {mode === "food" && (
         <div className="grid grid-cols-2 gap-2">
-          {MEALS.map((m) => (
+          {meals.map((m) => (
             <button
               key={m.id}
               onClick={() => {
-                push({ kind: "foodSearch", meal: m.id, date });
+                push({ kind: "logFood", meal: m.id, date });
                 setMode("choose");
               }}
               className={clsx("rounded-2xl p-4 text-left font-semibold active:bg-surf3", m.id === suggestedMeal ? "bg-good/15 text-good" : "bg-surf2")}
