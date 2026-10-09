@@ -7,7 +7,7 @@ import type { FoodLogEntry, MealDef, NutritionGoals } from "../types";
 import { addDays, dayNum, dowShort, friendlyDate, longDate, todayKey, weekDays, formatDuration } from "../lib/date";
 import { useSwipe } from "../lib/useSwipe";
 import { dayStats } from "../lib/day";
-import { BAR_COLOR, amountLabel, calorieStatus, entryMacros, statusColor, sumEntries } from "../lib/nutrition";
+import { BAR_COLOR, amountLabel, calorieStatus, entryMacros, statusColor, sumEntries, type CalorieStatus } from "../lib/nutrition";
 import { fmt } from "../lib/format";
 import { completedSets, exercisesVolume } from "../lib/workout";
 import { Button, Card, Confirm, NumberInput, ProgressBar, Sheet, SectionTitle, inputCls } from "../components/ui";
@@ -15,6 +15,7 @@ import { MonthCalendar } from "../components/MonthCalendar";
 import { FoodEntrySheet } from "./LogFood";
 import { AddMealSheet } from "../components/AddMealSheet";
 import { MealSummary } from "../components/MealSummary";
+import { GettingStarted } from "../components/GettingStarted";
 
 export function Home() {
   const date = useApp((s) => s.selectedDate);
@@ -49,10 +50,10 @@ export function Home() {
 
   // Per-day calorie status for the dots under the week strip
   const weekStatus = useMemo(() => {
-    const m = new Map<string, string>();
+    const m = new Map<string, CalorieStatus>();
     for (const k of weekDays(date)) {
       const st = dayStats(k, { foodLog, workouts, steps, weights });
-      if (st.food.calories > 0) m.set(k, statusColor(calorieStatus(st.food.calories, goals.calories + st.exercise, goals.overAllowance)));
+      if (st.food.calories > 0) m.set(k, calorieStatus(st.food.calories, goals.calories + st.exercise, goals.overAllowance));
     }
     return m;
   }, [date, foodLog, workouts, steps, weights, goals]);
@@ -101,12 +102,13 @@ export function Home() {
           </button>
         </div>
 
-        {/* Week strip — swipe to change week */}
-        <div {...weekSwipe} className="grid select-none grid-cols-7 gap-1 px-3 pb-3">
+        {/* Week strip — one small card per day: green when the day's calories are within goal, red when over */}
+        <div {...weekSwipe} className="grid select-none grid-cols-7 gap-1.5 px-3 pb-3">
           {weekDays(date).map((k) => {
             const sel = k === date;
             const isToday = k === todayKey();
-            const has = marked.has(k);
+            const st = weekStatus.get(k);
+            const future = k > todayKey();
             return (
               <button
                 key={k}
@@ -114,17 +116,23 @@ export function Home() {
                   setSlide(k > date ? "l" : "r");
                   setDate(k);
                 }}
+                aria-label={`${longDate(k)}${st === "good" ? ", within goal" : st === "over" ? ", over goal" : ""}`}
+                aria-pressed={sel}
                 className={clsx(
-                  "flex flex-col items-center rounded-2xl py-1.5 transition",
-                  sel ? "bg-acc text-white" : "text-tx2 active:bg-surf2",
+                  "flex flex-col items-center rounded-xl py-1.5 transition active:scale-95",
+                  sel ? "border-2" : "border",
+                  st === "good" && (sel ? "border-good bg-good/25" : "border-good/50 bg-good/10"),
+                  st === "over" && (sel ? "border-bad bg-bad/25" : "border-bad/50 bg-bad/10"),
+                  !st && (sel ? "border-tx2 bg-surf2" : "border-line bg-surf"),
+                  future && !sel && "opacity-50",
                 )}
               >
-                <span className={clsx("text-[11px] font-medium", !sel && isToday && "text-acc")}>{dowShort(k)}</span>
-                <span className={clsx("text-[17px] font-semibold", !sel && (isToday ? "text-acc" : "text-tx"))}>{dayNum(k)}</span>
-                <span
-                  className={clsx("mt-0.5 h-1.5 w-1.5 rounded-full", !has && "bg-transparent", has && !weekStatus.has(k) && (sel ? "bg-white" : "bg-tx3"))}
-                  style={weekStatus.has(k) ? { background: weekStatus.get(k), boxShadow: sel ? "0 0 0 1.5px #fff" : undefined } : undefined}
-                />
+                <span className={clsx("text-[11px] font-medium", st === "good" ? "text-good" : st === "over" ? "text-bad" : isToday ? "text-acc" : "text-tx2")}>
+                  {dowShort(k)}
+                </span>
+                <span className={clsx("text-[17px] font-semibold leading-tight", st === "good" ? "text-good" : st === "over" ? "text-bad" : isToday ? "text-acc" : "text-tx")}>
+                  {dayNum(k)}
+                </span>
               </button>
             );
           })}
@@ -133,6 +141,7 @@ export function Home() {
 
       {/* Day content — swipe to change day */}
       <div {...daySwipe} key={date} className={clsx("flex-1 px-3 pb-36", slide && "animate-fade-in")}>
+        {date === todayKey() && <GettingStarted />}
         <Card>
           <CalorieSection goal={goals.calories} food={stats.food.calories} exercise={stats.exercise} allowance={goals.overAllowance} />
           <div className="mt-4 grid grid-cols-3 gap-4 border-t border-line pt-4">

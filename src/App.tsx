@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Apple, BarChart3, CalendarCheck, ClipboardList, Dumbbell, Footprints, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
+import { Apple, BarChart3, UserRound, CalendarCheck, ClipboardList, Dumbbell, Footprints, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
 import clsx from "clsx";
 import { useApp } from "./store/app";
 import { useUi, type Page, type Tab } from "./store/ui";
@@ -12,6 +12,7 @@ import { LogFood } from "./screens/LogFood";
 import { ActiveWorkout } from "./screens/ActiveWorkout";
 import { ExerciseGoalsPage, ExerciseWeeklyPage, NutritionGoalsPage, NutritionWeeklyPage, StepsPage, WeightPage } from "./screens/MenuPages";
 import { useStartWorkout } from "./screens/startWorkout";
+import { Onboarding } from "./screens/Onboarding";
 import { Sheet } from "./components/ui";
 import type { Meal } from "./types";
 
@@ -21,6 +22,9 @@ export default function App() {
   const workoutOpen = useUi((s) => s.workoutOpen);
   const toast = useUi((s) => s.toast);
   const active = useApp((s) => s.active);
+  // First launch: nothing set up and nothing logged yet. People who already use the app can
+  // open the same setup from Menu → Set up my plan.
+  const firstRun = useApp((s) => !s.onboarded && s.foodLog.length === 0 && s.workouts.length === 0);
 
   // Android/browser back button closes the top page instead of leaving the app.
   useEffect(() => {
@@ -61,6 +65,8 @@ export default function App() {
       ))}
       {active && workoutOpen && <ActiveWorkout />}
 
+      {firstRun && <Onboarding onDone={() => useUi.getState().showToast("You're all set — log your first meal!")} />}
+
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[90] flex justify-center">
           <div className="rounded-full bg-surf3 px-4 py-2 text-sm font-medium shadow-lg animate-fade-in">{toast}</div>
@@ -92,6 +98,16 @@ function PageView({ page }: { page: Page }) {
       return <ExerciseWeeklyPage />;
     case "steps":
       return <StepsPage />;
+    case "onboarding":
+      return (
+        <Onboarding
+          onCancel={() => useUi.getState().pop()}
+          onDone={() => {
+            useUi.getState().pop();
+            useUi.getState().showToast("Plan updated");
+          }}
+        />
+      );
   }
 }
 
@@ -239,6 +255,7 @@ function BigChoice({ icon, label, sub, color, onClick }: { icon: React.ReactNode
 function MenuDrawer() {
   const open = useUi((s) => s.menuOpen);
   const { setMenu, push } = useUi();
+  const name = useApp((s) => s.profile?.name);
   if (!open) return null;
   const Item = ({ icon, label, page }: { icon: React.ReactNode; label: string; page: Page }) => (
     <button onClick={() => push(page)} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left font-medium active:bg-surf2">
@@ -251,13 +268,18 @@ function MenuDrawer() {
       <div className="absolute inset-0 bg-black/60 animate-fade-in" onClick={() => setMenu(false)} />
       <aside className="pt-safe absolute inset-y-0 left-0 w-[80%] max-w-xs overflow-y-auto bg-surf animate-slide-right">
         <div className="flex items-center justify-between px-5 py-4">
-          <div className="text-xl font-bold">Pulse</div>
+          <div>
+            <div className="text-xl font-bold">Pulse</div>
+            {name && <div className="text-sm text-tx2">Hi, {name}</div>}
+          </div>
           <button onClick={() => setMenu(false)} className="rounded-full p-1.5 text-tx2 active:bg-surf2" aria-label="Close menu">
             <X size={20} />
           </button>
         </div>
         <div className="px-2">
-          <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-good">Nutrition</div>
+          <Item icon={<UserRound size={20} />} label="Set up my plan" page={{ kind: "onboarding" }} />
+
+          <div className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-good">Nutrition</div>
           <Item icon={<Target size={20} />} label="Daily goals" page={{ kind: "nutritionGoals" }} />
           <Item icon={<BarChart3 size={20} />} label="Weekly summary" page={{ kind: "nutritionWeekly" }} />
           <Item icon={<Scale size={20} />} label="Weight tracker" page={{ kind: "weight" }} />

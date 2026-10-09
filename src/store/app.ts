@@ -25,9 +25,17 @@ import { todayKey } from "../lib/date";
 import { uid } from "../lib/id";
 import { bestsFromSets, detectPRs, exerciseBests } from "../lib/workout";
 import { gramsPerServing } from "../lib/foodText";
+import type { Profile } from "../lib/plan";
 
 export interface AppState {
   selectedDate: string;
+
+  profile: Profile | null;
+  onboarded: boolean;
+  checklistDismissed: boolean;
+  /** Save the profile and the (possibly edited) targets from onboarding, and log today's weight. */
+  completeOnboarding: (profile: Profile, targets: { nutrition: NutritionGoals; steps: number }) => void;
+  dismissChecklist: () => void;
 
   meals: MealDef[];
   customFoods: Food[];
@@ -166,6 +174,23 @@ export const useApp = create<AppState>()(
   persist(
     (set, get) => ({
       selectedDate: todayKey(),
+
+      profile: null,
+      onboarded: false,
+      checklistDismissed: false,
+      completeOnboarding: (profile, { nutrition, steps }) =>
+        set((s) => {
+          const today = todayKey();
+          return {
+            profile,
+            onboarded: true,
+            checklistDismissed: false,
+            nutritionGoals: { ...s.nutritionGoals, ...nutrition },
+            exerciseGoals: { ...s.exerciseGoals, steps, workoutsPerWeek: profile.workoutsPerWeek },
+            weights: [...s.weights.filter((w) => w.date !== today), { date: today, kg: profile.weightKg }].sort((a, b) => a.date.localeCompare(b.date)),
+          };
+        }),
+      dismissChecklist: () => set({ checklistDismissed: true }),
 
       meals: DEFAULT_MEALS,
       customFoods: [],
