@@ -12,6 +12,29 @@ npm test           # PR detection / date logic tests
 npm run build      # typecheck + production build
 ```
 
+## Install on Android
+
+Every push to `main` builds a signed APK (GitHub Actions → "Android APK") and publishes it under
+**Releases**. On your phone: open the repo's Releases page, download the newest `pulse-1.0.N.apk` and
+open it (allow "install unknown apps" for your browser the first time). New builds install over the old
+one and keep your data. Requires Android 8.0+.
+
+**Your data on Android** lives inside the app (native storage):
+- Android Auto Backup copies it to your Google Drive (roughly daily, on Wi-Fi while charging) and puts it
+  back automatically when you reinstall — make sure *Settings → Google → Backup* is on.
+- Settings → Backup → **Export** saves a file (share it to Drive/WhatsApp/Files) and **Restore** loads one.
+  Use this before uninstalling or switching phones; it's instant and doesn't depend on Google's schedule.
+
+**Steps:** Settings → Steps → Connect Health Connect. Pulse reads daily steps (only steps) that Google Fit,
+Samsung Health, Fitbit or your band write to Health Connect, and refreshes them whenever the app opens.
+
+**Signing:** `android/app/pulse.keystore` is committed so every CI build can update the installed app. If
+the repo ever becomes public or you publish to the Play Store, create a new key, keep it out of git, and
+pass it via the `PULSE_KEYSTORE*` environment variables (see `android/app/build.gradle`).
+
+Local Android builds need Android Studio / the Android SDK: `npm run build && npx cap sync android`, then
+open `android/` in Android Studio.
+
 ## What's in it
 
 **First launch:** Welcome → About you (sex, age, height, weight) → Your plan (calories, macros, steps —
@@ -30,6 +53,7 @@ estimated with Mifflin–St Jeor, all editable) → Done. Re-run any time from M
 **Bottom bar:** Previous workouts · Workout routines · **Today** (pill) · My Foods · **+** (Workout or Food)
 
 **Menu**
+- Set up my plan · Settings (kg/lb, Health Connect steps, backup export/restore)
 - Nutrition: Daily goals (calories, macros, over-goal allowance, optional lose/maintain/gain helper)
   · Weekly summary · Weight tracker
 - Exercise: Daily goals (calories, minutes, workouts/week, steps) · Weekly summary · Step tracker
