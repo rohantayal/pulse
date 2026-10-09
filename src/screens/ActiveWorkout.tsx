@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, MoreHorizontal, Plus, Repeat, Settings, Timer, Trash2, Trophy, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, MoreHorizontal, Plus, Repeat, Settings, Timer, Trash2, TrendingUp, Trophy, X } from "lucide-react";
 import clsx from "clsx";
-import { allExercises, useApp } from "../store/app";
+import { allExercises, useApp, useUnit } from "../store/app";
+import { fromUnit, toUnit } from "../lib/units";
 import { useUi } from "../store/ui";
 import type { Exercise, PrKind, WorkoutExercise, WorkoutSet } from "../types";
 import { formatClock, formatDuration } from "../lib/date";
@@ -29,6 +30,7 @@ interface PrFlash {
 }
 
 export function ActiveWorkout() {
+  const { unit, show } = useUnit();
   const active = useApp((s) => s.active);
   const workouts = useApp((s) => s.workouts);
   const custom = useApp((s) => s.customExercises);
@@ -108,7 +110,7 @@ export function ActiveWorkout() {
           {/* duration | volume | sets */}
           <div className="grid grid-cols-3 px-4 pb-3">
             <TopStat label="Duration" value={formatDuration(now - active.startedAt)} accent />
-            <TopStat label="Volume" value={`${fmt(volume)} kg`} />
+            <TopStat label="Volume" value={`${fmt(show(volume))} ${unit}`} />
             <TopStat label="Sets" value={String(sets)} />
           </div>
         </header>
@@ -189,6 +191,19 @@ export function ActiveWorkout() {
       <Sheet open={!!menuFor} onClose={() => setMenuFor(null)} title={menuFor ? byId.get(menuFor.exerciseId)?.name : ""}>
         {menuFor && (
           <div className="space-y-2">
+            <Button
+              variant="secondary"
+              className="w-full justify-start"
+              onClick={() => {
+                // Progress opens as a page; minimise the workout so it isn't hidden underneath.
+                const exerciseId = menuFor.exerciseId;
+                setMenuFor(null);
+                setWorkoutOpen(false);
+                useUi.getState().push({ kind: "exerciseProgress", exerciseId });
+              }}
+            >
+              <TrendingUp size={16} /> See progress
+            </Button>
             <Button
               variant="secondary"
               className="w-full justify-start"
@@ -289,6 +304,7 @@ function ExerciseBlock({
   onSetMenu: (s: WorkoutSet, n: number) => void;
 }) {
   const store = useApp.getState();
+  const unit = useApp((s) => s.unit);
   return (
     <section className="border-b border-line px-4 py-4">
       <div className="mb-3 flex items-center gap-2">
@@ -306,7 +322,7 @@ function ExerciseBlock({
       <div className="grid grid-cols-[2.25rem_1fr_4.5rem_4rem_2.5rem] items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-tx3">
         <div className="text-center">Set</div>
         <div>Previous</div>
-        <div className="text-center">Kg</div>
+        <div className="text-center">{unit}</div>
         <div className="text-center">Reps</div>
         <div className="flex justify-center">
           <Check size={14} />
@@ -333,9 +349,14 @@ function ExerciseBlock({
                 className="truncate text-left text-sm text-tx2"
                 title="Tap to copy"
               >
-                {prev ? formatSet(prev) : "–"}
+                {prev ? formatSet(prev, unit) : "–"}
               </button>
-              <SetInput value={s.kg} placeholder={prev?.kg != null ? String(+prev.kg.toFixed(2)) : "0"} onChange={(v) => store.updateSet(we.id, s.id, { kg: v })} done={s.done} />
+              <SetInput
+                value={s.kg == null ? null : toUnit(s.kg, unit)}
+                placeholder={prev?.kg != null ? String(+toUnit(prev.kg, unit).toFixed(1)) : "0"}
+                onChange={(v) => store.updateSet(we.id, s.id, { kg: v == null ? null : fromUnit(v, unit) })}
+                done={s.done}
+              />
               <SetInput
                 value={s.reps}
                 placeholder={prev?.reps != null ? String(prev.reps) : "0"}
@@ -397,6 +418,7 @@ function SetInput({
 }
 
 function PrCelebration({ flash, onClose }: { flash: PrFlash; onClose: () => void }) {
+  const unit = useApp((s) => s.unit);
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-8" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 animate-fade-in" />
@@ -421,7 +443,7 @@ function PrCelebration({ flash, onClose }: { flash: PrFlash; onClose: () => void
         </div>
         <div className="mt-3 text-xl font-bold text-gold">New PR!</div>
         <div className="mt-1 text-sm font-semibold">{flash.exercise}</div>
-        <div className="text-sm text-tx2">{formatSet(flash.set)}</div>
+        <div className="text-sm text-tx2">{formatSet(flash.set, unit)}</div>
         <div className="mt-3 flex flex-wrap justify-center gap-1.5">
           {flash.kinds.map((k) => (
             <span key={k} className="rounded-full bg-gold/15 px-2.5 py-1 text-xs font-semibold text-gold">

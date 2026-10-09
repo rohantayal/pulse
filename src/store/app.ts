@@ -23,14 +23,18 @@ import { PRELOADED_FOODS } from "../data/foods";
 import { PRELOADED_EXERCISES } from "../data/exercises";
 import { todayKey } from "../lib/date";
 import { uid } from "../lib/id";
-import { bestsFromSets, detectPRs, exerciseBests } from "../lib/workout";
+import { bestsFromSets, detectPRs, exerciseBests, recomputePrs } from "../lib/workout";
 import { gramsPerServing } from "../lib/foodText";
 import type { Profile } from "../lib/plan";
+import { toUnit, type WeightUnit } from "../lib/units";
 
 export interface AppState {
   selectedDate: string;
 
   profile: Profile | null;
+  /** Display unit for weights. Everything is stored in kg. */
+  unit: WeightUnit;
+  setUnit: (u: WeightUnit) => void;
   onboarded: boolean;
   checklistDismissed: boolean;
   /** Save the profile and the (possibly edited) targets from onboarding, and log today's weight. */
@@ -94,6 +98,8 @@ export interface AppState {
   finishWorkout: (opts: { name: string; caloriesBurned: number; notes?: string }) => Workout | null;
   discardWorkout: () => void;
   deleteWorkout: (id: string) => void;
+  /** Replace a finished workout (edited) and re-derive PRs across history. */
+  updateWorkout: (w: Workout) => void;
   saveWorkoutAsRoutine: (workoutId: string) => Routine | null;
 
   setSettings: (s: Partial<WorkoutSettings>) => void;
@@ -177,6 +183,8 @@ export const useApp = create<AppState>()(
       selectedDate: todayKey(),
 
       profile: null,
+      unit: "kg",
+      setUnit: (unit) => set({ unit }),
       onboarded: false,
       checklistDismissed: false,
       completeOnboarding: (profile, { nutrition, steps }) =>
@@ -405,7 +413,8 @@ export const useApp = create<AppState>()(
         return workout;
       },
       discardWorkout: () => set({ active: null }),
-      deleteWorkout: (id) => set((s) => ({ workouts: s.workouts.filter((w) => w.id !== id) })),
+      deleteWorkout: (id) => set((s) => ({ workouts: recomputePrs(s.workouts.filter((w) => w.id !== id)) })),
+      updateWorkout: (w) => set((s) => ({ workouts: recomputePrs(s.workouts.map((x) => (x.id === w.id ? w : x))) })),
 
       saveWorkoutAsRoutine: (workoutId) => {
         const w = get().workouts.find((x) => x.id === workoutId);
@@ -434,4 +443,14 @@ export const useApp = create<AppState>()(
 /** Only meals the user added can be deleted; the four defaults can just be renamed. */
 export function isCustomMeal(id: string): boolean {
   return id.startsWith("meal:");
+}
+
+/** Current weight unit plus converters bound to it. */
+export function useUnit() {
+  const unit = useApp((s) => s.unit);
+  return {
+    unit,
+    /** kg → display number */
+    show: (kg: number) => toUnit(kg, unit),
+  };
 }

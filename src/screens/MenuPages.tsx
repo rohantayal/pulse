@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import clsx from "clsx";
-import { useApp } from "../store/app";
+import { useApp, useUnit } from "../store/app";
+import { fromUnit } from "../lib/units";
 import { buildPlan, goalBlocked, maxPace, type GoalType } from "../lib/plan";
 import { useUi } from "../store/ui";
 import type { ExerciseGoals, NutritionGoals } from "../types";
@@ -146,6 +147,7 @@ export function NutritionGoalsPage() {
 function WeightGoalCard({ onUse }: { onUse: (n: { calories: number; protein: number; carbs: number; fat: number }) => void }) {
   const profile = useApp((s) => s.profile);
   const push = useUi((s) => s.push);
+  const { unit, show } = useUnit();
   const [goal, setGoal] = useState<GoalType>(profile?.goal ?? "maintain");
   const [pace, setPace] = useState(profile?.pace ?? 0.5);
 
@@ -196,7 +198,7 @@ function WeightGoalCard({ onUse }: { onUse: (n: { calories: number; protein: num
         <div className="mt-2 flex gap-2">
           {paces.map((x) => (
             <button key={x} onClick={() => setPace(x)} className={clsx("flex-1 rounded-lg py-1.5 text-xs font-medium", pace === x ? "bg-surf3 text-tx" : "bg-surf2 text-tx2")}>
-              {x} kg/wk
+              {unit === "lb" ? `${fmt(show(x), 1)} lb` : `${x} kg`}/wk
             </button>
           ))}
         </div>
@@ -368,7 +370,9 @@ export function WeightPage() {
   const weights = useApp((s) => s.weights);
   const setWeight = useApp((s) => s.setWeight);
   const [date, setDate] = useState(todayKey());
-  const [kg, setKg] = useState<number | null>(weights[weights.length - 1]?.kg ?? null);
+  const { unit, show } = useUnit();
+  // The input works in the display unit; it's converted to kg on save.
+  const [kg, setKg] = useState<number | null>(weights.length ? show(weights[weights.length - 1].kg) : null);
   const [range, setRange] = useState<30 | 90 | 0>(90);
 
   const shown = useMemo(() => {
@@ -387,23 +391,23 @@ export function WeightPage() {
         <div className="grid grid-cols-3 gap-2">
           <Card className="text-center">
             <div className="text-xs text-tx2">Current</div>
-            <div className="text-lg font-bold tabular-nums">{last ? fmt(last.kg, 1) : "–"}</div>
+            <div className="text-lg font-bold tabular-nums">{last ? fmt(show(last.kg), 1) : "–"}</div>
           </Card>
           <Card className="text-center">
             <div className="text-xs text-tx2">Start</div>
-            <div className="text-lg font-bold tabular-nums">{first ? fmt(first.kg, 1) : "–"}</div>
+            <div className="text-lg font-bold tabular-nums">{first ? fmt(show(first.kg), 1) : "–"}</div>
           </Card>
           <Card className="text-center">
             <div className="text-xs text-tx2">Change</div>
             <div className={clsx("text-lg font-bold tabular-nums", change < 0 ? "text-good" : change > 0 ? "text-gold" : "")}>
-              {first ? `${change > 0 ? "+" : ""}${fmt(change, 1)}` : "–"}
+              {first ? `${change > 0 ? "+" : ""}${fmt(show(change), 1)}` : "–"}
             </div>
           </Card>
         </div>
 
         <Card className="mt-3">
           <div className="mb-2 flex items-center justify-between">
-            <div className="text-sm font-semibold">Body weight (kg)</div>
+            <div className="text-sm font-semibold">Body weight ({unit})</div>
             <div className="flex gap-1 rounded-lg bg-surf2 p-0.5 text-xs">
               {([30, 90, 0] as const).map((r) => (
                 <button key={r} onClick={() => setRange(r)} className={clsx("rounded-md px-2 py-1 font-medium", range === r ? "bg-surf3 text-tx" : "text-tx2")}>
@@ -413,7 +417,7 @@ export function WeightPage() {
             </div>
           </div>
           {shown.length > 0 ? (
-            <LineChart data={shown.map((w) => ({ key: w.date, label: `${dayNum(w.date)} ${monthShort(w.date)}`, value: w.kg }))} color={C.protein} unit="kg" />
+            <LineChart data={shown.map((w) => ({ key: w.date, label: `${dayNum(w.date)} ${monthShort(w.date)}`, value: show(w.kg) }))} color={C.protein} unit={unit} />
           ) : (
             <div className="py-10 text-center text-sm text-tx2">Log your weight to see the trend.</div>
           )}
@@ -426,10 +430,10 @@ export function WeightPage() {
               <input type="date" className={inputCls} value={date} max={todayKey()} onChange={(e) => e.target.value && setDate(e.target.value)} />
             </Field>
             <Field label="Weight">
-              <NumberInput value={kg} onChange={setKg} suffix="kg" />
+              <NumberInput value={kg} onChange={setKg} suffix={unit} />
             </Field>
           </div>
-          <Button className="w-full" disabled={!kg || kg <= 0} onClick={() => kg && setWeight(date, kg)}>
+          <Button className="w-full" disabled={!kg || kg <= 0} onClick={() => kg && setWeight(date, fromUnit(kg, unit))}>
             Save entry
           </Button>
         </Card>
@@ -442,7 +446,9 @@ export function WeightPage() {
                 <div key={w.date} className="flex items-center justify-between px-4 py-2.5 text-sm">
                   <span className="text-tx2">{longDate(w.date)}</span>
                   <span className="flex items-center gap-3">
-                    <span className="font-semibold tabular-nums">{fmt(w.kg, 1)} kg</span>
+                    <span className="font-semibold tabular-nums">
+                      {fmt(show(w.kg), 1)} {unit}
+                    </span>
                     <button onClick={() => setWeight(w.date, null)} className="text-tx3 active:text-bad" aria-label="Delete entry">
                       <Trash2 size={15} />
                     </button>
@@ -522,6 +528,7 @@ export function ExerciseGoalsPage() {
 
 export function ExerciseWeeklyPage() {
   const pop = useUi((s) => s.pop);
+  const { unit, show } = useUnit();
   const { foodLog, workouts, steps, weights, exerciseGoals: goals } = useApp();
   const { days, nav } = useWeek();
   const stats = useMemo(() => days.map((d) => ({ d, s: dayStats(d, { foodLog, workouts, steps, weights }) })), [days.join(), foodLog, workouts, steps, weights]);
@@ -564,7 +571,9 @@ export function ExerciseWeeklyPage() {
           </Card>
           <Card className="text-center">
             <div className="text-xs text-tx2">Volume</div>
-            <div className="text-[15px] font-bold tabular-nums">{fmt(volume)} kg</div>
+            <div className="text-[15px] font-bold tabular-nums">
+              {fmt(show(volume))} {unit}
+            </div>
           </Card>
           <Card className="text-center">
             <div className="text-xs text-tx2">Steps</div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Workout, WorkoutSet } from "../types";
-import { bestsFromSets, detectPRs, exerciseBests, exercisesVolume, oneRepMax, previousSets } from "../lib/workout";
+import { bestsFromSets, detectPRs, exerciseBests, exercisesVolume, oneRepMax, previousSets, recomputePrs } from "../lib/workout";
 
 const set = (kg: number | null, reps: number | null, done = true): WorkoutSet => ({ id: Math.random().toString(), kg, reps, done });
 
@@ -49,5 +49,21 @@ describe("previousSets", () => {
   it("returns the most recent workout's sets for that exercise", () => {
     const h = [workout(1, "bench", [set(60, 10)]), workout(5, "bench", [set(70, 8), set(70, 7)]), workout(3, "bench", [set(65, 9)])];
     expect(previousSets(h, "bench").map((s) => s.kg)).toEqual([70, 70]);
+  });
+});
+
+describe("recomputePrs", () => {
+  it("re-awards records in order after an edit", () => {
+    const w1 = workout(1, "bench", [set(60, 8)]);
+    const w2 = workout(2, "bench", [set(70, 8)]); // PR over w1
+    const w3 = workout(3, "bench", [set(65, 8)]); // not a PR
+    let out = recomputePrs([w3, w2, w1]);
+    expect(out.find((w) => w.id === "2")!.exercises[0].sets[0].pr).toContain("weight");
+    expect(out.find((w) => w.id === "3")!.exercises[0].sets[0].pr).toBeUndefined();
+    // Edit w2 down to 62 kg: now w3 (65) becomes the record
+    const edited = { ...w2, exercises: [{ ...w2.exercises[0], sets: [set(62, 8)] }] };
+    out = recomputePrs([w1, edited, w3]);
+    expect(out.find((w) => w.id === "3")!.exercises[0].sets[0].pr).toContain("weight");
+    expect(out.find((w) => w.id === "1")!.exercises[0].sets[0].pr).toBeUndefined(); // first time: no PR
   });
 });

@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { CalendarDays, ChevronRight, Dumbbell, Footprints, Menu, MoreHorizontal, Pencil, Plus, Scale, Share2, Trash2 } from "lucide-react";
 import clsx from "clsx";
-import { isCustomMeal, useApp } from "../store/app";
+import { isCustomMeal, useApp, useUnit } from "../store/app";
+import { fromUnit } from "../lib/units";
 import { useUi } from "../store/ui";
 import type { FoodLogEntry, MealDef, NutritionGoals } from "../types";
 import { addDays, dayNum, dowShort, friendlyDate, longDate, todayKey, weekDays, formatDuration } from "../lib/date";
@@ -18,6 +19,7 @@ import { MealSummary } from "../components/MealSummary";
 import { GettingStarted } from "../components/GettingStarted";
 
 export function Home() {
+  const { unit, show } = useUnit();
   const date = useApp((s) => s.selectedDate);
   const setDate = useApp((s) => s.setDate);
   const foodLog = useApp((s) => s.foodLog);
@@ -69,7 +71,7 @@ export function Home() {
       `Carbs ${fmt(stats.food.carbs)}/${goals.carbs} g · Protein ${fmt(stats.food.protein)}/${goals.protein} g · Fat ${fmt(stats.food.fat)}/${goals.fat} g`,
       stats.steps ? `Steps: ${fmt(stats.steps)}` : "",
       ...stats.workouts.map(
-        (w) => `🏋️ ${w.name} – ${formatDuration(w.endedAt - w.startedAt)}, ${fmt(exercisesVolume(w.exercises))} kg volume, ${completedSets(w.exercises)} sets`,
+        (w) => `🏋️ ${w.name} – ${formatDuration(w.endedAt - w.startedAt)}, ${fmt(show(exercisesVolume(w.exercises)))} ${unit} volume, ${completedSets(w.exercises)} sets`,
       ),
     ].filter(Boolean);
     const text = lines.join("\n");
@@ -181,7 +183,7 @@ export function Home() {
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{w.name}</div>
                 <div className="text-xs text-tx2">
-                  {formatDuration(w.endedAt - w.startedAt)} · {fmt(exercisesVolume(w.exercises))} kg · {completedSets(w.exercises)} set{completedSets(w.exercises) === 1 ? "" : "s"}
+                  {formatDuration(w.endedAt - w.startedAt)} · {fmt(show(exercisesVolume(w.exercises)))} {unit} · {completedSets(w.exercises)} set{completedSets(w.exercises) === 1 ? "" : "s"}
                 </div>
               </div>
               <div className="text-sm font-semibold">{w.caloriesBurned} kcal</div>
@@ -215,7 +217,7 @@ export function Home() {
             <Scale size={18} />
           </div>
           <div className="flex-1 font-medium">Weight</div>
-          <div className="text-sm font-semibold">{weight != null ? `${fmt(weight, 1)} kg` : <span className="text-acc">Log</span>}</div>
+          <div className="text-sm font-semibold">{weight != null ? `${fmt(show(weight), 1)} ${unit}` : <span className="text-acc">Log</span>}</div>
           <ChevronRight size={18} className="text-tx3" />
         </Card>
       </div>
@@ -256,10 +258,10 @@ export function Home() {
       <QuickNumberSheet
         open={weightOpen}
         title="Body weight"
-        initial={weight ?? null}
-        suffix="kg"
+        initial={weight != null ? show(weight) : null}
+        suffix={unit}
         onClose={() => setWeightOpen(false)}
-        onSave={(v) => useApp.getState().setWeight(date, v && v > 0 ? v : null)}
+        onSave={(v) => useApp.getState().setWeight(date, v && v > 0 ? fromUnit(v, unit) : null)}
       />
     </div>
   );

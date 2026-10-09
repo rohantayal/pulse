@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { ClipboardList, Clock, Dumbbell, Flame, MoreHorizontal, Trash2, Trophy } from "lucide-react";
-import { allExercises, useApp } from "../store/app";
+import { ChevronRight, ClipboardList, Clock, Dumbbell, Flame, MoreHorizontal, Pencil, Trash2, Trophy } from "lucide-react";
+import { allExercises, useApp, useUnit } from "../store/app";
 import { useUi } from "../store/ui";
 import type { Workout } from "../types";
 import { formatDuration, longDate, fromKey } from "../lib/date";
@@ -16,6 +16,7 @@ function prCount(w: Workout) {
 }
 
 export function HistoryPage() {
+  const { unit, show } = useUnit();
   const workouts = useApp((s) => s.workouts);
   const custom = useApp((s) => s.customExercises);
   const push = useUi((s) => s.push);
@@ -69,7 +70,9 @@ export function HistoryPage() {
                         <span className="flex items-center gap-1.5 text-tx2">
                           <Clock size={14} /> {formatDuration(w.endedAt - w.startedAt)}
                         </span>
-                        <span className="text-tx2">{fmt(exercisesVolume(w.exercises))} kg</span>
+                        <span className="text-tx2">
+                          {fmt(show(exercisesVolume(w.exercises)))} {unit}
+                        </span>
                         <span className="text-tx2">
                           {completedSets(w.exercises)} set{completedSets(w.exercises) === 1 ? "" : "s"}
                         </span>
@@ -80,7 +83,7 @@ export function HistoryPage() {
                             <span className="truncate">
                               {e.sets.length} × {names.get(e.exerciseId) ?? "Unknown"}
                             </span>
-                            <span className="shrink-0 text-tx2">{formatSet(bestSet(e.sets))}</span>
+                            <span className="shrink-0 text-tx2">{formatSet(bestSet(e.sets), unit)}</span>
                           </div>
                         ))}
                         {w.exercises.length > 4 && <div className="text-xs text-tx3">+{w.exercises.length - 4} more</div>}
@@ -102,9 +105,10 @@ function bestSet(sets: Workout["exercises"][number]["sets"]) {
 }
 
 export function WorkoutDetail({ workoutId }: { workoutId: string }) {
+  const { unit, show } = useUnit();
   const w = useApp((s) => s.workouts.find((x) => x.id === workoutId));
   const custom = useApp((s) => s.customExercises);
-  const { pop, showToast } = useUi();
+  const { pop, push, showToast } = useUi();
   const [menu, setMenu] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const byId = useMemo(() => new Map(allExercises(custom).map((e) => [e.id, e])), [custom]);
@@ -133,7 +137,7 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
       <div className="px-3 pb-10">
         <div className="grid grid-cols-4 gap-2 rounded-2xl bg-surf p-4 text-center">
           <DStat icon={<Clock size={14} />} label="Duration" value={formatDuration(w.endedAt - w.startedAt)} />
-          <DStat label="Volume" value={`${fmt(exercisesVolume(w.exercises))} kg`} />
+          <DStat label="Volume" value={`${fmt(show(exercisesVolume(w.exercises)))} ${unit}`} />
           <DStat label="Sets" value={String(completedSets(w.exercises))} />
           <DStat icon={<Flame size={14} />} label="kcal" value={String(w.caloriesBurned)} />
         </div>
@@ -143,7 +147,10 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
           const ex = byId.get(e.exerciseId);
           return (
             <div key={e.id} className="mt-3 rounded-2xl bg-surf p-4">
-              <div className="font-semibold text-acc">{ex?.name ?? "Unknown exercise"}</div>
+              <button onClick={() => push({ kind: "exerciseProgress", exerciseId: e.exerciseId })} className="flex items-center gap-1 font-semibold text-acc">
+                {ex?.name ?? "Unknown exercise"}
+                <ChevronRight size={16} />
+              </button>
               <div className="mt-2 grid grid-cols-[2.5rem_1fr_auto] gap-y-1 text-[11px] font-semibold uppercase tracking-wide text-tx3">
                 <div>Set</div>
                 <div>Weight & reps</div>
@@ -152,8 +159,8 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
               {e.sets.map((s, i) => (
                 <div key={s.id} className="grid grid-cols-[2.5rem_1fr_auto] items-center py-1 text-sm">
                   <div className="font-semibold text-tx2">{s.pr?.length ? <Trophy size={15} className="text-gold" fill="#f5c542" /> : i + 1}</div>
-                  <div className="font-medium">{formatSet(s)}</div>
-                  <div className="text-right text-tx2">{s.kg ? `${fmt(oneRepMax(s.kg, s.reps ?? 0), 1)} kg` : "–"}</div>
+                  <div className="font-medium">{formatSet(s, unit)}</div>
+                  <div className="text-right text-tx2">{s.kg ? `${fmt(show(oneRepMax(s.kg, s.reps ?? 0)), 1)} ${unit}` : "–"}</div>
                 </div>
               ))}
             </div>
@@ -163,6 +170,16 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
 
       <Sheet open={menu} onClose={() => setMenu(false)} title={w.name}>
         <div className="space-y-2">
+          <Button
+            variant="secondary"
+            className="w-full justify-start"
+            onClick={() => {
+              setMenu(false);
+              push({ kind: "workoutEditor", workoutId: w.id });
+            }}
+          >
+            <Pencil size={16} /> Edit workout
+          </Button>
           <Button
             variant="secondary"
             className="w-full justify-start"

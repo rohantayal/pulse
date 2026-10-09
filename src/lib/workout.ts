@@ -1,4 +1,5 @@
 import type { PrKind, Workout, WorkoutExercise, WorkoutSet } from "../types";
+import { toUnit, type WeightUnit } from "./units";
 
 export function isCountable(s: WorkoutSet): boolean {
   return s.done && s.reps != null && s.reps > 0;
@@ -103,10 +104,10 @@ export function previousSets(history: Workout[], exerciseId: string): WorkoutSet
   return sets;
 }
 
-export function formatSet(s: Pick<WorkoutSet, "kg" | "reps">): string {
+export function formatSet(s: Pick<WorkoutSet, "kg" | "reps">, unit: WeightUnit = "kg"): string {
   if (s.reps == null) return "–";
   if (!s.kg) return `${s.reps} reps`;
-  return `${+s.kg.toFixed(2)}kg × ${s.reps}`;
+  return `${+toUnit(s.kg, unit).toFixed(1)}${unit} × ${s.reps}`;
 }
 
 /**
@@ -115,4 +116,28 @@ export function formatSet(s: Pick<WorkoutSet, "kg" | "reps">): string {
 export function estimateWorkoutCalories(durationMs: number, bodyKg = 70): number {
   const minutes = durationMs / 60_000;
   return Math.round(5 * 3.5 * bodyKg / 200 * minutes);
+}
+
+/**
+ * Re-derive every set's PR badges from scratch, oldest workout first. Used after a workout is
+ * edited or deleted, since changing an old set can create or remove records in later workouts.
+ */
+export function recomputePrs(workouts: Workout[]): Workout[] {
+  const order = [...workouts].sort((a, b) => a.startedAt - b.startedAt);
+  const bests = new Map<string, Bests>();
+  const updated = new Map<string, Workout>();
+  for (const w of order) {
+    const exercises = w.exercises.map((e) => {
+      let b = bests.get(e.exerciseId) ?? NO_BESTS;
+      const sets = e.sets.map((s) => {
+        const pr = detectPRs(s, b);
+        b = bestsFromSets([s], b);
+        return { ...s, pr: pr.length ? pr : undefined };
+      });
+      bests.set(e.exerciseId, b);
+      return { ...e, sets };
+    });
+    updated.set(w.id, { ...w, exercises });
+  }
+  return workouts.map((w) => updated.get(w.id)!);
 }

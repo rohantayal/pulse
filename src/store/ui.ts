@@ -9,6 +9,8 @@ export type Page =
   | { kind: "foodEditor"; foodId?: string; name?: string }
   | { kind: "routineEditor"; routineId?: string }
   | { kind: "workoutDetail"; workoutId: string }
+  | { kind: "workoutEditor"; workoutId: string }
+  | { kind: "exerciseProgress"; exerciseId: string }
   | { kind: "nutritionGoals" }
   | { kind: "nutritionWeekly" }
   | { kind: "weight" }

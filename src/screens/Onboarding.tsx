@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { useApp } from "../store/app";
 import { buildPlan, type Profile, type Sex } from "../lib/plan";
 import { fmt } from "../lib/format";
+import { fromUnit, toUnit } from "../lib/units";
 import { Button, NumberInput, inputCls } from "../components/ui";
 
 // Kept deliberately short: only what the app needs to set your targets — no judging questions.
@@ -159,6 +160,7 @@ function AboutStep(props: {
   setHeightUnit: (u: "cm" | "ft") => void;
 }) {
   const { p, set, age, setAge, weight, setWeight, heightCm, setHeightCm, heightUnit, setHeightUnit } = props;
+  const unit = useApp((s) => s.unit);
   // Feet and inches are kept exactly as typed; converting back from rounded cm on every
   // keystroke would turn 5 ft into 4 ft 12 in.
   const [ft, setFt] = useState<number | null>(() => (heightCm != null ? Math.floor(heightCm / 2.54 / 12) : null));
@@ -202,14 +204,24 @@ function AboutStep(props: {
           </div>
           <div className="mt-1 text-xs text-tx3">Used only for the calorie formula.</div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 items-end gap-3">
           <div>
             <Label>Age</Label>
             <NumberInput value={age} onChange={(v) => setAge(v == null ? null : Math.round(v))} suffix="yrs" step="1" />
           </div>
           <div>
-            <Label>Weight</Label>
-            <NumberInput value={weight} onChange={setWeight} suffix="kg" />
+            <div className="flex items-center justify-between">
+              <Label>Weight</Label>
+              <div className="mb-2 flex rounded-lg bg-surf2 p-0.5 text-xs font-medium">
+                {(["kg", "lb"] as const).map((u) => (
+                  <button key={u} onClick={() => useApp.getState().setUnit(u)} className={clsx("rounded-md px-2 py-1", unit === u ? "bg-surf3 text-tx" : "text-tx2")}>
+                    {u}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Stored in kg; shown and typed in the chosen unit */}
+            <NumberInput value={weight == null ? null : toUnit(weight, unit)} onChange={(v) => setWeight(v == null ? null : fromUnit(v, unit))} suffix={unit} />
           </div>
         </div>
         <div>

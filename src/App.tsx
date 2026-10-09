@@ -13,6 +13,8 @@ import { ActiveWorkout } from "./screens/ActiveWorkout";
 import { ExerciseGoalsPage, ExerciseWeeklyPage, NutritionGoalsPage, NutritionWeeklyPage, StepsPage, WeightPage } from "./screens/MenuPages";
 import { useStartWorkout } from "./screens/startWorkout";
 import { Onboarding } from "./screens/Onboarding";
+import { WorkoutEditor } from "./screens/WorkoutEditor";
+import { ExerciseProgress } from "./screens/ExerciseProgress";
 import { Sheet } from "./components/ui";
 import type { Meal } from "./types";
 
@@ -88,6 +90,10 @@ function PageView({ page }: { page: Page }) {
       return <RoutineEditor routineId={page.routineId} />;
     case "workoutDetail":
       return <WorkoutDetail workoutId={page.workoutId} />;
+    case "workoutEditor":
+      return <WorkoutEditor workoutId={page.workoutId} />;
+    case "exerciseProgress":
+      return <ExerciseProgress exerciseId={page.exerciseId} />;
     case "nutritionGoals":
       return <NutritionGoalsPage />;
     case "nutritionWeekly":
