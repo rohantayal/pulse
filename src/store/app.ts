@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type {
@@ -27,6 +28,7 @@ import { bestsFromSets, detectPRs, exerciseBests, recomputePrs } from "../lib/wo
 import { gramsPerServing } from "../lib/foodText";
 import type { Profile } from "../lib/plan";
 import { toUnit, type WeightUnit } from "../lib/units";
+import { appStorage } from "../lib/platform";
 
 export interface AppState {
   selectedDate: string;
@@ -41,6 +43,16 @@ export interface AppState {
   completeOnboarding: (profile: Profile, targets: { nutrition: NutritionGoals; steps: number }) => void;
   dismissChecklist: () => void;
   updateProfile: (patch: Partial<Profile>) => void;
+
+  /** Steps from Health Connect (Android). */
+  healthSteps: { enabled: boolean; lastSync?: number };
+  setHealthSteps: (h: { enabled: boolean; lastSync?: number }) => void;
+  /** Bulk-set steps from Health Connect: one value per day. */
+  importSteps: (days: { date: string; steps: number }[]) => void;
+  lastBackupAt?: number;
+  markBackedUp: () => void;
+  /** Replace all data with a backup's contents. */
+  restoreData: (data: Record<string, unknown>) => void;
 
   meals: MealDef[];
   customFoods: Food[];
@@ -177,6 +189,20 @@ function defaultName(): string {
   return "Evening Workout";
 }
 
+/** Values used for anything a backup file doesn't include. */
+const RESTORE_DEFAULTS = {
+  profile: null,
+  onboarded: true,
+  checklistDismissed: true,
+  customFoods: [],
+  foodLog: [],
+  recentFoodIds: [],
+  weights: [],
+  steps: [],
+  customExercises: [],
+  workouts: [],
+};
+
 export const useApp = create<AppState>()(
   persist(
     (set, get) => ({
@@ -200,6 +226,17 @@ export const useApp = create<AppState>()(
           };
         }),
       dismissChecklist: () => set({ checklistDismissed: true }),
+      healthSteps: { enabled: false },
+      setHealthSteps: (healthSteps) => set({ healthSteps }),
+      importSteps: (days) =>
+        set((s) => {
+          const map = new Map(s.steps.map((x) => [x.date, x.steps]));
+          for (const d of days) if (d.steps > 0) map.set(d.date, Math.round(d.steps));
+          return { steps: [...map].map(([date, steps]) => ({ date, steps })).sort((a, b) => a.date.localeCompare(b.date)) };
+        }),
+      lastBackupAt: undefined,
+      markBackedUp: () => set({ lastBackupAt: Date.now() }),
+      restoreData: (data) => set({ ...RESTORE_DEFAULTS, ...data, active: (data.active as ActiveWorkout | null | undefined) ?? null, selectedDate: todayKey() }),
       updateProfile: (patch) => set((s) => (s.profile ? { profile: { ...s.profile, ...patch } } : {})),
 
       meals: DEFAULT_MEALS,
@@ -429,7 +466,7 @@ export const useApp = create<AppState>()(
     }),
     {
       name: "pulse-app-v1",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => appStorage),
       // The selected day is per-session; always open on today.
       partialize: (s) => {
         const { selectedDate: _ignored, ...rest } = s;
@@ -453,4 +490,16 @@ export function useUnit() {
     /** kg → display number */
     show: (kg: number) => toUnit(kg, unit),
   };
+}
+
+/** True once saved data has been loaded (instant in the browser, async in the Android app). */
+export function useHydrated(): boolean {
+  const [done, setDone] = useState(() => useApp.persist.hasHydrated());
+  useEffect(() => {
+    if (done) return;
+    const unsub = useApp.persist.onFinishHydration(() => setDone(true));
+    if (useApp.persist.hasHydrated()) setDone(true);
+    return unsub;
+  }, [done]);
+  return done;
 }

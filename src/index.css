@@ -32,9 +32,14 @@ input[type="number"] {
   scrollbar-width: none;
 }
 
+/* Browsers fill env(); the Android app (Capacitor) also injects --safe-area-inset-*. */
+:root {
+  --sa-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --sa-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+}
 .pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--sa-bottom);
 }
 .pt-safe {
-  padding-top: env(safe-area-inset-top);
+  padding-top: var(--sa-top);
 }

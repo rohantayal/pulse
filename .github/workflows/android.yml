@@ -1,0 +1,77 @@
+name: Android APK
+
+# Builds a signed APK on every push to main and publishes it as a GitHub Release,
+# so the newest build can be downloaded straight onto the phone.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 1.0.${{ github.run_number }}
+      APP_VERSION: 1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Copy into the Android project
+        run: npx cap sync android
+
+      - name: Build signed APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk "pulse-$VERSION_NAME.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pulse-${{ env.VERSION_NAME }}
+          path: pulse-${{ env.VERSION_NAME }}.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION_NAME }}
+          name: Pulse ${{ env.VERSION_NAME }}
+          target_commitish: ${{ github.sha }}
+          make_latest: "true"
+          files: pulse-${{ env.VERSION_NAME }}.apk
+          body: |
+            Install on Android: open this page on your phone, download the APK below and open it.
+            The first time, Android asks you to allow installs from your browser — allow it.
+            Each new build installs over the old one and keeps your data.

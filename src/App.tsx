@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Apple, BarChart3, UserRound, CalendarCheck, ClipboardList, Dumbbell, Footprints, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
+import { Apple, BarChart3, UserRound, Settings as SettingsIcon, CalendarCheck, ClipboardList, Dumbbell, Footprints, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
 import clsx from "clsx";
-import { useApp } from "./store/app";
+import { useApp, useHydrated } from "./store/app";
 import { useUi, type Page, type Tab } from "./store/ui";
 import { formatDuration, todayKey } from "./lib/date";
 import { Home } from "./screens/Home";
@@ -15,10 +15,19 @@ import { useStartWorkout } from "./screens/startWorkout";
 import { Onboarding } from "./screens/Onboarding";
 import { WorkoutEditor } from "./screens/WorkoutEditor";
 import { ExerciseProgress } from "./screens/ExerciseProgress";
+import { SettingsPage } from "./screens/Settings";
+import { useStepSync } from "./lib/useStepSync";
 import { Sheet } from "./components/ui";
 import type { Meal } from "./types";
 
 export default function App() {
+  const hydrated = useHydrated();
+  if (!hydrated) return <div className="h-full bg-bg" />;
+  return <Shell />;
+}
+
+function Shell() {
+  useStepSync();
   const tab = useUi((s) => s.tab);
   const stack = useUi((s) => s.stack);
   const workoutOpen = useUi((s) => s.workoutOpen);
@@ -72,7 +81,7 @@ export default function App() {
       {firstRun && <Onboarding onDone={() => setFirstRun(false)} />}
 
       {toast && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[90] flex justify-center">
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+var(--sa-bottom))] z-[90] flex justify-center">
           <div className="rounded-full bg-surf3 px-4 py-2 text-sm font-medium shadow-lg animate-fade-in">{toast}</div>
         </div>
       )}
@@ -106,6 +115,8 @@ function PageView({ page }: { page: Page }) {
       return <ExerciseWeeklyPage />;
     case "steps":
       return <StepsPage />;
+    case "settings":
+      return <SettingsPage />;
     case "onboarding":
       return (
         <Onboarding
@@ -286,6 +297,7 @@ function MenuDrawer() {
         </div>
         <div className="px-2">
           <Item icon={<UserRound size={20} />} label="Set up my plan" page={{ kind: "onboarding" }} />
+          <Item icon={<SettingsIcon size={20} />} label="Settings" page={{ kind: "settings" }} />
 
           <div className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-good">Nutrition</div>
           <Item icon={<Target size={20} />} label="Daily goals" page={{ kind: "nutritionGoals" }} />
@@ -314,7 +326,7 @@ function WorkoutBar() {
   return (
     <button
       onClick={() => setWorkoutOpen(true)}
-      className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 mx-auto flex max-w-md items-center gap-3 border-t border-line bg-surf px-4 py-2.5 text-left"
+      className="fixed inset-x-0 bottom-[calc(4rem+var(--sa-bottom))] z-20 mx-auto flex max-w-md items-center gap-3 border-t border-line bg-surf px-4 py-2.5 text-left"
     >
       <span className="relative flex h-2.5 w-2.5">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-acc opacity-60" />
