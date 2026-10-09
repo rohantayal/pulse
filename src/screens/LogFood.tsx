@@ -7,7 +7,8 @@ import type { Food, FoodLogEntry, Macros, Meal } from "../types";
 import { friendlyDate } from "../lib/date";
 import { fmt } from "../lib/format";
 import { ZERO, add, amountLabel, scale, toServings } from "../lib/nutrition";
-import { bestMatch, gramsPerServing, parseFoodText, rankFoods, type Unit } from "../lib/foodText";
+import { bestMatch, gramsPerServing, parseFoodText, rankFoods, suggestions, type Unit } from "../lib/foodText";
+import { sumEntries } from "../lib/nutrition";
 import { Button, Field, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
 import { AddMealSheet } from "../components/AddMealSheet";
 
@@ -30,6 +31,8 @@ interface Item {
   servings: number | null;
   macros: Macros;
   manual: boolean;
+  /** Close matches offered when nothing matched fully */
+  suggest: Food[];
 }
 
 const C = { carbs: "#199e70", protein: "#3987e5", fat: "#d95926" };
@@ -39,6 +42,9 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
   const meals = useApp((s) => s.meals);
   const customFoods = useApp((s) => s.customFoods);
   const recentIds = useApp((s) => s.recentFoodIds);
+  const foodLog = useApp((s) => s.foodLog);
+  const goals = useApp((s) => s.nutritionGoals);
+  const eatenToday = useMemo(() => sumEntries(foodLog.filter((e) => e.date === date)), [foodLog, date]);
   const [meal, setMeal] = useState<Meal>(initialMeal);
   const [text, setText] = useState("");
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
@@ -82,6 +88,7 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
           servings,
           macros: food && servings != null ? scale(food, servings) : ZERO,
           manual: !!o.foodId,
+          suggest: food ? [] : suggestions(p.query, foods, recentIds),
         };
       }),
     [text, overrides, foods, byId, recentIds],
@@ -129,7 +136,7 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
     <Screen>
       <PageHeader title="Log food" subtitle={friendlyDate(date)} onBack={pop} />
 
-      <div className="px-3 pb-40">
+      <div className="px-3 pb-52">
         {/* Meal picker */}
         <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto">
           {meals.map((m) => (
@@ -172,6 +179,7 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
                 item={it}
                 onChange={() => setChanging(it)}
                 onCreate={() => createFor(it)}
+                onPick={(f) => setOverride(it.key, { foodId: f.id })}
                 onRemove={() => removeItem(it)}
                 onAmount={(qty, unit) => setOverride(it.key, { qty, unit })}
               />
@@ -180,23 +188,7 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
         )}
 
         {/* Meal total */}
-        {ready.length > 0 && (
-          <div className="mt-3 rounded-2xl border border-acc/30 bg-acc/10 p-4">
-            <div className="flex items-baseline justify-between">
-              <div className="text-sm font-semibold">
-                {mealLabel} total <span className="font-normal text-tx2">· {ready.length} item{ready.length > 1 ? "s" : ""}</span>
-              </div>
-              <div className="text-xl font-bold tabular-nums">
-                {fmt(total.calories)} <span className="text-xs font-medium text-tx2">kcal</span>
-              </div>
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <MacroPill label="Carbs" value={total.carbs} color={C.carbs} />
-              <MacroPill label="Protein" value={total.protein} color={C.protein} />
-              <MacroPill label="Fat" value={total.fat} color={C.fat} />
-            </div>
-          </div>
-        )}
+        {ready.length > 0 && <MealTotalCard label={mealLabel} count={ready.length} meal={total} before={eatenToday} goals={goals} />}
 
         {/* Recent foods for one-tap adding */}
         {recent.length > 0 && (
@@ -252,12 +244,14 @@ function ItemCard({
   item,
   onChange,
   onCreate,
+  onPick,
   onRemove,
   onAmount,
 }: {
   item: Item;
   onChange: () => void;
   onCreate: () => void;
+  onPick: (f: Food) => void;
   onRemove: () => void;
   onAmount: (qty: number | null, unit: Unit) => void;
 }) {
@@ -278,6 +272,18 @@ function ItemCard({
                 <Search size={14} /> Search
               </button>
             </div>
+            {item.suggest.length > 0 && (
+              <div className="mt-2.5">
+                <div className="mb-1 text-[11px] text-tx3">Did you mean</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {item.suggest.map((f) => (
+                    <button key={f.id} onClick={() => onPick(f)} className="rounded-full bg-surf2 px-2.5 py-1 text-xs text-tx2 active:bg-surf3">
+                      {f.name} <span className="text-tx3">· {fmt(f.calories)} kcal</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <button onClick={onRemove} className="rounded-full p-1 text-tx3" aria-label="Remove">
             <X size={16} />
@@ -387,13 +393,75 @@ function Mac({ label, value, color }: { label: string; value: number; color: str
   );
 }
 
-function MacroPill({ label, value, color }: { label: string; value: number; color: string }) {
+const METRICS = [
+  { key: "calories", label: "Calories", unit: "kcal", color: "#e8e8ea" },
+  { key: "carbs", label: "Carbs", unit: "g", color: C.carbs },
+  { key: "protein", label: "Protein", unit: "g", color: C.protein },
+  { key: "fat", label: "Fat", unit: "g", color: C.fat },
+] as const;
+
+/**
+ * Calories | Carbs | Protein | Fat for the meal being logged. Each bar is today's goal:
+ * the faint part is what you'd already eaten today, the bright part is this meal.
+ */
+function MealTotalCard({ label, count, meal, before, goals }: { label: string; count: number; meal: Macros; before: Macros; goals: Macros }) {
+  const after = add(before, meal);
+  const pct = (v: number, g: number) => (g > 0 ? (v / g) * 100 : 0);
+  const kcalLeft = goals.calories - after.calories;
+  const proteinHit = before.protein < goals.protein && after.protein >= goals.protein;
+  const message = proteinHit
+    ? { icon: "🎯", text: "This meal hits your protein goal!" }
+    : kcalLeft < -goals.calories * 0.05
+      ? { icon: "⚠️", text: `Puts you ${fmt(-kcalLeft)} kcal over today's goal` }
+      : pct(meal.protein, goals.protein) >= 30
+        ? { icon: "💪", text: `${Math.round(pct(meal.protein, goals.protein))}% of today's protein in one meal` }
+        : { icon: "✨", text: `${fmt(Math.max(0, kcalLeft))} kcal left today after this` };
+
   return (
-    <div className="rounded-xl bg-bg/40 py-2">
-      <div className="text-[15px] font-semibold tabular-nums">{fmt(value, 1)} g</div>
-      <div className="flex items-center justify-center gap-1 text-[11px] text-tx2">
-        <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
-        {label}
+    <div className="mt-3 rounded-2xl border border-acc/30 bg-acc/10 p-4">
+      <div className="flex items-baseline justify-between">
+        <div className="text-[15px] font-semibold">
+          {label} total <span className="text-sm font-normal text-tx2">· {count} item{count > 1 ? "s" : ""}</span>
+        </div>
+        <div className="text-[11px] text-tx3">% of daily goal</div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-4 gap-3">
+        {METRICS.map((m) => {
+          const v = meal[m.key];
+          const goal = goals[m.key];
+          const mealPct = pct(v, goal);
+          const beforePct = Math.min(100, pct(before[m.key], goal));
+          const afterPct = pct(after[m.key], goal);
+          const over = afterPct > 105;
+          const onTarget = !over && afterPct >= 90;
+          return (
+            <div key={m.key} className="min-w-0">
+              <div className="flex items-center gap-1 text-[11px] font-medium text-tx2">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: m.color }} />
+                <span className="truncate">{m.label}</span>
+              </div>
+              <div className="mt-1 text-[22px] font-bold leading-none tabular-nums">{fmt(v, m.unit === "g" && v < 10 ? 1 : 0)}</div>
+              <div className="text-[10px] text-tx3">{m.unit}</div>
+              <div className={clsx("mt-2 flex h-2.5 gap-[2px] overflow-hidden rounded-full bg-surf3", over && "ring-1 ring-bad")}>
+                {beforePct > 0 && <div className="h-full shrink-0 opacity-35 transition-all duration-500" style={{ width: `${beforePct}%`, background: m.color }} />}
+                <div
+                  className="h-full shrink-0 rounded-r-full transition-all duration-500"
+                  style={{ width: `${Math.min(100 - beforePct, mealPct)}%`, background: over ? "#e66767" : m.color }}
+                />
+              </div>
+              <div className="mt-1.5 text-[13px] font-semibold tabular-nums">+{Math.round(mealPct)}%</div>
+              <div className={clsx("text-[10px] tabular-nums", over ? "text-bad" : onTarget ? "text-good" : "text-tx3")}>
+                {Math.round(afterPct)}% today{onTarget ? " ✓" : over ? " ↑" : ""}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2 rounded-xl bg-bg/40 px-3 py-2 text-sm">
+        <span>{message.icon}</span>
+        <span className="text-tx2">{message.text}</span>
       </div>
     </div>
   );

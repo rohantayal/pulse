@@ -41,7 +41,11 @@ const SERVING_WORDS = new Set([
   "big", "portion", "portions", "x", "nos", "no", "unit", "units", "pack", "packet", "packets", "can", "cans", "bar", "bars",
 ]);
 
-const STOP_WORDS = new Set(["of", "with", "some", "the", "and", "had", "ate", "i", "my", "for", "in", "on", "little", "bit"]);
+const STOP_WORDS = new Set([
+  "of", "with", "some", "the", "and", "had", "ate", "i", "my", "for", "in", "on", "little", "bit",
+  // words that describe how food was made/served but never pick a different food
+  "homemade", "home", "made", "fresh", "hot", "cold", "warm", "ghar", "ka", "ki", "ke", "wala", "wali", "wale",
+]);
 
 /** Hindi/Indian-English words → the words our food names use. */
 const ALIASES: Record<string, string> = {
@@ -191,6 +195,8 @@ function tokenScore(q: string, f: string): number {
 export interface Match {
   food: Food;
   score: number;
+  /** Every word you typed matched a word of this food. Only full matches are picked automatically. */
+  full: boolean;
 }
 
 /**
@@ -207,6 +213,7 @@ export function rankFoods(query: string, foods: Food[], recentIds: string[] = []
     const ft = normTokens(`${food.name} ${food.brand ?? ""}`);
     if (ft.length === 0) return;
     let covered = 0;
+    let missed = 0;
     const hit = new Set<string>();
     for (const qt of q) {
       let best = 0;
@@ -220,6 +227,7 @@ export function rankFoods(query: string, foods: Food[], recentIds: string[] = []
       }
       covered += best;
       if (bestTok) hit.add(bestTok);
+      else missed++;
     }
     const queryCoverage = covered / q.length;
     if (queryCoverage < 0.5) return;
@@ -236,16 +244,26 @@ export function rankFoods(query: string, foods: Food[], recentIds: string[] = []
     const r = recent.get(food.id);
     const recency = r != null ? 0.08 * (1 - r / Math.max(1, recentIds.length)) : 0;
     const mine = food.custom ? 0.05 : 0;
-    out.push({ food, idx, score: queryCoverage + 0.35 * nameCoverage + exact + recency + mine });
+    out.push({ food, idx, full: missed === 0, score: queryCoverage + 0.35 * nameCoverage + exact + recency + mine });
   });
   // Ties go to list order — the built-in list puts the everyday version first (white rice before jeera rice).
-  return out.sort((a, b) => b.score - a.score || a.idx - b.idx).map(({ food, score }) => ({ food, score }));
+  return out.sort((a, b) => b.score - a.score || a.idx - b.idx).map(({ food, score, full }) => ({ food, score, full }));
 }
 
-/** The best match, or null when nothing is a confident match. */
+/**
+ * The best match, or null when nothing is a confident match. Only foods that account for every
+ * word you typed qualify — "tomato curry" must not quietly become "Tomato" just because one word fits.
+ */
 export function bestMatch(query: string, foods: Food[], recentIds: string[] = []): Food | null {
-  const top = rankFoods(query, foods, recentIds)[0];
+  const top = rankFoods(query, foods, recentIds).find((m) => m.full);
   return top && top.score >= 0.75 ? top.food : null;
+}
+
+/** Close-but-not-full matches, offered as "Did you mean…" when nothing matched. */
+export function suggestions(query: string, foods: Food[], recentIds: string[] = [], limit = 3): Food[] {
+  return rankFoods(query, foods, recentIds)
+    .slice(0, limit)
+    .map((m) => m.food);
 }
 
 // ---------------------------------------------------------------- serving weight

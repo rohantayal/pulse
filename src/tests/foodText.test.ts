@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PRELOADED_FOODS } from "../data/foods";
-import { bestMatch, gramsPerServing, parseFoodText, parsePart } from "../lib/foodText";
+import { bestMatch, gramsPerServing, parseFoodText, parsePart, suggestions } from "../lib/foodText";
 
 const match = (q: string) => bestMatch(q, PRELOADED_FOODS)?.name ?? null;
 
@@ -57,6 +57,24 @@ describe("matching the built-in foods", () => {
     ["masala dosa", "Masala Dosa"],
   ])("%s → %s", (q, expected) => {
     expect(match(q)).toBe(expected);
+  });
+
+  it("doesn't match on just one of the words you typed", () => {
+    expect(match("tomato curry")).toBeNull();
+    expect(match("mushroom curry")).toBeNull();
+    expect(match("banana bread")).toBeNull();
+    expect(match("egg fried rice")).toBeNull();
+  });
+
+  it("ignores words like homemade/fresh that don't change the food", () => {
+    expect(match("homemade dal tadka")).toBe("Dal Tadka");
+    expect(match("ghar ka khichdi")).toBe("Khichdi");
+  });
+
+  it("suggests close foods when there's no full match", () => {
+    const names = suggestions("tomato curry", PRELOADED_FOODS).map((f) => f.name);
+    expect(names).toContain("Tomato");
+    expect(names.some((n) => n.includes("Curry"))).toBe(true);
   });
 
   it("returns null when nothing matches", () => {
