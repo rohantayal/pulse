@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { useApp, useUnit } from "../store/app";
 import { fromUnit } from "../lib/units";
+import { isNative } from "../lib/platform";
+import { syncStepsNow } from "../lib/useStepSync";
 import { buildPlan, goalBlocked, maxPace, type GoalType } from "../lib/plan";
 import { useUi } from "../store/ui";
 import type { ExerciseGoals, NutritionGoals } from "../types";
@@ -616,7 +618,9 @@ export function ExerciseWeeklyPage() {
 // ---------------------------------------------------------------- Steps
 
 export function StepsPage() {
-  const pop = useUi((s) => s.pop);
+  const { pop, push, showToast } = useUi();
+  const health = useApp((s) => s.healthSteps);
+  const healthOn = health.enabled;
   const steps = useApp((s) => s.steps);
   const goal = useApp((s) => s.exerciseGoals.steps);
   const setSteps = useApp((s) => s.setSteps);
@@ -668,6 +672,28 @@ export function StepsPage() {
           <BarChart data={data} goal={goal} color={C.steps} unit="steps" />
         </Card>
 
+        {healthOn ? (
+          <Card className="mt-3 flex items-center gap-3">
+            <div className="flex-1 text-sm text-tx2">
+              Steps come from Health Connect automatically{health.lastSync ? ` · updated ${new Date(health.lastSync).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}.
+            </div>
+            <Button
+              variant="secondary"
+              className="h-9 text-sm"
+              onClick={async () => {
+                try {
+                  await syncStepsNow();
+                  showToast("Steps updated");
+                } catch {
+                  showToast("Couldn't reach Health Connect");
+                }
+              }}
+            >
+              Sync now
+            </Button>
+          </Card>
+        ) : (
+        <>
         <SectionTitle>Log steps</SectionTitle>
         <Card className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -691,7 +717,14 @@ export function StepsPage() {
           <Button className="w-full" disabled={val == null || val < 0} onClick={() => setSteps(date, val ? Math.round(val) : null)}>
             Save
           </Button>
+          {isNative && (
+            <button onClick={() => push({ kind: "settings" })} className="w-full text-center text-xs text-acc">
+              Get steps automatically — connect Health Connect in Settings
+            </button>
+          )}
         </Card>
+        </>
+        )}
       </div>
     </Screen>
   );

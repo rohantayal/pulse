@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Apple, BarChart3, UserRound, Settings as SettingsIcon, CalendarCheck, ClipboardList, Dumbbell, Footprints, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
+import { Apple, BarChart3, Settings as SettingsIcon, CalendarCheck, ClipboardList, Dumbbell, Footprints, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
 import clsx from "clsx";
 import { useApp, useHydrated } from "./store/app";
 import { useUi, type Page, type Tab } from "./store/ui";
@@ -34,7 +34,7 @@ function Shell() {
   const toast = useUi((s) => s.toast);
   const active = useApp((s) => s.active);
   // First launch: nothing set up and nothing logged yet. People who already use the app can
-  // open the same setup from Menu → Set up my plan.
+  // open the same setup from Menu → Settings → Set up my plan again.
   const firstRunNow = useApp((s) => !s.onboarded && s.foodLog.length === 0 && s.workouts.length === 0);
   // Decided once at launch, so setup stays open through its "Done" screen after the plan is saved.
   const [firstRun, setFirstRun] = useState(firstRunNow);
@@ -296,7 +296,6 @@ function MenuDrawer() {
           </button>
         </div>
         <div className="px-2">
-          <Item icon={<UserRound size={20} />} label="Set up my plan" page={{ kind: "onboarding" }} />
           <Item icon={<SettingsIcon size={20} />} label="Settings" page={{ kind: "settings" }} />
 
           <div className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-good">Nutrition</div>

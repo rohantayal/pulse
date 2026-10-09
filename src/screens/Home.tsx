@@ -6,7 +6,8 @@ import { fromUnit } from "../lib/units";
 import { useUi } from "../store/ui";
 import type { FoodLogEntry, MealDef, NutritionGoals } from "../types";
 import { addDays, dayNum, dowShort, friendlyDate, longDate, todayKey, weekDays, formatDuration } from "../lib/date";
-import { useSwipe } from "../lib/useSwipe";
+import { useSlide } from "../lib/useSlide";
+import { syncStepsNow } from "../lib/useStepSync";
 import { dayStats } from "../lib/day";
 import { BAR_COLOR, amountLabel, calorieStatus, entryMacros, statusColor, sumEntries, type CalorieStatus } from "../lib/nutrition";
 import { fmt } from "../lib/format";
@@ -34,21 +35,34 @@ export function Home() {
   const [calOpen, setCalOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<FoodLogEntry | null>(null);
   const [stepsOpen, setStepsOpen] = useState(false);
+  const healthOn = useApp((s) => s.healthSteps.enabled);
+  // With Health Connect connected, steps are automatic — tapping refreshes instead of asking.
+  async function onStepsTap() {
+    if (!healthOn) return setStepsOpen(true);
+    try {
+      await syncStepsNow();
+      showToast("Steps updated from Health Connect");
+    } catch {
+      showToast("Couldn't reach Health Connect");
+    }
+  }
   const [weightOpen, setWeightOpen] = useState(false);
   const [addingMeal, setAddingMeal] = useState(false);
   const [mealMenu, setMealMenu] = useState<MealDef | null>(null);
-  const [slide, setSlide] = useState<"l" | "r" | null>(null);
 
   const stats = useMemo(() => dayStats(date, { foodLog, workouts, steps, weights }), [date, foodLog, workouts, steps, weights]);
   const dayEntries = useMemo(() => foodLog.filter((e) => e.date === date), [foodLog, date]);
   const weight = weights.find((w) => w.date === date)?.kg;
 
-  const go = (n: number) => {
-    setSlide(n > 0 ? "l" : "r");
-    setDate(addDays(date, n));
+  // Swiping slides between days (content) and weeks (strip); tapping a day slides the same way.
+  const daySlide = useSlide();
+  daySlide.onSwipe((dir) => setDate(addDays(useApp.getState().selectedDate, dir)));
+  const weekSlide = useSlide();
+  weekSlide.onSwipe((dir) => setDate(addDays(useApp.getState().selectedDate, 7 * dir)));
+  const pickDay = (k: string) => {
+    if (k === date) return;
+    daySlide.slideTo(k > date ? 1 : -1, () => setDate(k));
   };
-  const daySwipe = useSwipe(() => go(1), () => go(-1));
-  const weekSwipe = useSwipe(() => go(7), () => go(-7));
 
   // Per-day calorie status for the dots under the week strip
   const weekStatus = useMemo(() => {
@@ -105,7 +119,8 @@ export function Home() {
         </div>
 
         {/* Week strip — one small card per day: green when the day's calories are within goal, red when over */}
-        <div {...weekSwipe} className="grid select-none grid-cols-7 gap-1.5 px-3 pb-3">
+        <div className="overflow-x-clip">
+        <div ref={weekSlide.ref} {...weekSlide.handlers} style={weekSlide.style} className="grid select-none grid-cols-7 gap-1.5 px-3 pb-3">
           {weekDays(date).map((k) => {
             const sel = k === date;
             const isToday = k === todayKey();
@@ -114,10 +129,7 @@ export function Home() {
             return (
               <button
                 key={k}
-                onClick={() => {
-                  setSlide(k > date ? "l" : "r");
-                  setDate(k);
-                }}
+                onClick={() => pickDay(k)}
                 aria-label={`${longDate(k)}${st === "good" ? ", within goal" : st === "over" ? ", over goal" : ""}`}
                 aria-pressed={sel}
                 className={clsx(
@@ -139,10 +151,12 @@ export function Home() {
             );
           })}
         </div>
+        </div>
       </header>
 
       {/* Day content — swipe to change day */}
-      <div {...daySwipe} key={date} className={clsx("flex-1 px-3 pb-36", slide && "animate-fade-in")}>
+      <div className="flex-1 overflow-x-clip">
+      <div ref={daySlide.ref} {...daySlide.handlers} style={daySlide.style} className="min-h-full px-3 pb-36">
         {date === todayKey() && <GettingStarted />}
         <Card>
           <CalorieSection goal={goals.calories} food={stats.food.calories} exercise={stats.exercise} allowance={goals.overAllowance} />
@@ -189,12 +203,15 @@ export function Home() {
               <div className="text-sm font-semibold">{w.caloriesBurned} kcal</div>
             </button>
           ))}
-          <button onClick={() => setStepsOpen(true)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-surf2">
+          <button onClick={onStepsTap} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-surf2">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-good/15 text-good">
               <Footprints size={18} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="font-medium">Steps</div>
+              <div className="flex items-center gap-1.5 font-medium">
+                Steps
+                {healthOn && <span className="rounded bg-good/15 px-1.5 py-0.5 text-[10px] font-semibold text-good">AUTO</span>}
+              </div>
               <ProgressBar value={stats.steps} max={exGoals.steps} color="#3fb96b" className="mt-1.5" />
             </div>
             <div className="text-right">
@@ -220,6 +237,7 @@ export function Home() {
           <div className="text-sm font-semibold">{weight != null ? `${fmt(show(weight), 1)} ${unit}` : <span className="text-acc">Log</span>}</div>
           <ChevronRight size={18} className="text-tx3" />
         </Card>
+      </div>
       </div>
 
       <Sheet open={calOpen} onClose={() => setCalOpen(false)} title="Go to date">

@@ -3,7 +3,7 @@ import { useApp } from "../store/app";
 import { isNative } from "./platform";
 import { readDailySteps, stepsGranted } from "./health";
 
-/** Pull the last two weeks of steps from Health Connect whenever the app opens or comes back. */
+/** Pull the last two weeks of steps from Health Connect (on open, on return, and every 5 minutes). */
 export async function syncStepsNow(): Promise<number> {
   const days = await readDailySteps(14);
   const st = useApp.getState();
@@ -36,6 +36,11 @@ export function useStepSync() {
     void run();
     const onVisible = () => document.visibilityState === "visible" && void run();
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    // Keep today's count fresh while the app stays open.
+    const timer = window.setInterval(() => document.visibilityState === "visible" && void run(), 5 * 60_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(timer);
+    };
   }, [enabled]);
 }
