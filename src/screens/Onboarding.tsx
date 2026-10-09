@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Check, ChevronLeft, Dumbbell, Flame, PieChart, Target, Trophy, Utensils } from "lucide-react";
+import { Check, ChevronLeft, Dumbbell, PieChart, Utensils } from "lucide-react";
 import clsx from "clsx";
 import { useApp } from "../store/app";
-import { buildPlan, macroKcal, macrosFor, splitOf, type MacroGrams, type Profile, type Sex } from "../lib/plan";
+import { buildPlan, macroKcal, type Profile, type Sex } from "../lib/plan";
+import { MacroEditor, macrosMatch, type CaloriesAndMacros } from "../components/MacroEditor";
 import { fmt } from "../lib/format";
 import { fromUnit, toUnit } from "../lib/units";
 import { Button, NumberInput, inputCls } from "../components/ui";
@@ -255,31 +256,12 @@ function AboutStep(props: {
 
 function PlanStep({ p, onSaved }: { p: Profile; onSaved: () => void }) {
   const plan = useMemo(() => buildPlan(p), [p]);
-  // Calories and macros stay in step: editing calories rescales the macros (same split),
-  // editing a macro updates calories to what the macros add up to.
-  const [calories, setCalories] = useState<number | null>(() => macroKcal(plan));
-  const [m, setM] = useState<MacroGrams>({ protein: plan.protein, carbs: plan.carbs, fat: plan.fat });
-  const [split, setSplit] = useState(() => splitOf(plan));
-
-  const changeCalories = (v: number | null) => {
-    setCalories(v);
-    if (v != null && v > 0) setM(macrosFor(v, split));
-  };
-  const changeMacro = (k: keyof MacroGrams, v: number | null) => {
-    const next = { ...m, [k]: Math.max(0, Math.round(v ?? 0)) };
-    setM(next);
-    setSplit(splitOf(next));
-    setCalories(macroKcal(next));
-  };
-
-  const sum = macroKcal(m);
-  const matches = calories != null && Math.abs(sum - calories) <= 4;
-  const pct = (x: number) => Math.round(x * 100);
-  const valid = calories != null && calories >= 800 && matches;
+  const [v, setV] = useState<CaloriesAndMacros>(() => ({ calories: macroKcal(plan), protein: plan.protein, carbs: plan.carbs, fat: plan.fat }));
+  const valid = v.calories != null && v.calories >= 800 && macrosMatch(v);
 
   function save() {
     if (!valid) return;
-    useApp.getState().completeOnboarding(p, { nutrition: { calories: calories!, ...m } });
+    useApp.getState().completeOnboarding(p, { nutrition: { calories: v.calories!, protein: v.protein, carbs: v.carbs, fat: v.fat } });
     onSaved();
   }
 
@@ -289,27 +271,12 @@ function PlanStep({ p, onSaved }: { p: Profile; onSaved: () => void }) {
 
       <div className="rounded-3xl bg-acc/10 p-5 text-center">
         <div className="text-sm font-medium text-tx2">Daily calories</div>
-        <div className="mt-1 text-[44px] font-bold leading-none tabular-nums text-acc">{fmt(calories ?? 0)}</div>
+        <div className="mt-1 text-[44px] font-bold leading-none tabular-nums text-acc">{fmt(v.calories ?? 0)}</div>
         <div className="mt-2 text-sm text-tx2">Based on your age, height and weight</div>
       </div>
 
-      <div className="mt-5 space-y-3 rounded-2xl bg-surf p-4">
-        <Row icon={<Target size={18} />} label="Calories" hint="kcal / day">
-          <NumberInput value={calories} onChange={(v) => changeCalories(v == null ? null : Math.round(v))} step="1" />
-        </Row>
-        <Row icon={<Trophy size={18} />} label="Protein" hint={`${pct(split.protein)}% of calories`}>
-          <NumberInput value={m.protein} onChange={(v) => changeMacro("protein", v)} suffix="g" step="1" />
-        </Row>
-        <Row icon={<Utensils size={18} />} label="Carbs" hint={`${pct(split.carbs)}% of calories`}>
-          <NumberInput value={m.carbs} onChange={(v) => changeMacro("carbs", v)} suffix="g" step="1" />
-        </Row>
-        <Row icon={<Flame size={18} />} label="Fat" hint={`${pct(split.fat)}% of calories`}>
-          <NumberInput value={m.fat} onChange={(v) => changeMacro("fat", v)} suffix="g" step="1" />
-        </Row>
-        <div className={clsx("flex items-center gap-1.5 border-t border-line pt-3 text-xs", matches ? "text-good" : "text-gold")}>
-          {matches ? <Check size={14} strokeWidth={3} /> : null}
-          {matches ? `Macros add up to ${fmt(sum)} kcal` : `Macros add up to ${fmt(sum)} kcal — enter calories to rebalance`}
-        </div>
+      <div className="mt-5 rounded-2xl bg-surf p-4">
+        <MacroEditor value={v} onChange={setV} />
       </div>
 
       <p className="mt-4 text-xs leading-relaxed text-tx3">Protein and carbs have 4 kcal per gram, fat has 9. A starting point, not a rule — change it any time in Menu → Daily goals.</p>
@@ -367,21 +334,6 @@ function DoneStep({ name, onDone }: { name?: string; onDone: () => void }) {
           Let's go
         </Button>
       </div>
-    </div>
-  );
-}
-
-function Row({ icon, label, hint, children }: { icon: ReactNode; label: string; hint: string; children: ReactNode }) {
-  return (
-    <div className="grid grid-cols-[1fr_8rem] items-center gap-3">
-      <div className="flex items-center gap-3">
-        <span className="text-tx3">{icon}</span>
-        <div>
-          <div className="font-medium">{label}</div>
-          <div className="text-xs text-tx3">{hint}</div>
-        </div>
-      </div>
-      {children}
     </div>
   );
 }

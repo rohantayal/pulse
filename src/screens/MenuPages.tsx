@@ -3,9 +3,10 @@ import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { useApp, useUnit } from "../store/app";
 import { fromUnit } from "../lib/units";
-import { buildPlan, goalBlocked, maxPace, type GoalType } from "../lib/plan";
+import { buildPlan, goalBlocked, macrosFor, maxPace, splitOf, type GoalType } from "../lib/plan";
+import { MacroEditor, macrosMatch, type CaloriesAndMacros } from "../components/MacroEditor";
 import { useUi } from "../store/ui";
-import type { ExerciseGoals, NutritionGoals } from "../types";
+import type { ExerciseGoals } from "../types";
 import { addDays, dayNum, dowShort, fromKey, longDate, monthShort, todayKey, weekDays, weekStart, formatDuration } from "../lib/date";
 import { fmt } from "../lib/format";
 import { BAR_COLOR, DEFAULT_OVER_ALLOWANCE, GOOD_COLOR, calorieStatus, macroCalories, statusColor } from "../lib/nutrition";
@@ -18,58 +19,37 @@ const C = { carbs: BAR_COLOR, protein: BAR_COLOR, fat: BAR_COLOR, cal: GOOD_COLO
 
 // ---------------------------------------------------------------- Nutrition goals
 
-const PRESETS: { name: string; c: number; p: number; f: number }[] = [
-  { name: "Balanced", c: 45, p: 25, f: 30 },
-  { name: "High protein", c: 35, p: 35, f: 30 },
-  { name: "Low carb", c: 20, p: 35, f: 45 },
-];
-
 export function NutritionGoalsPage() {
   const { pop, showToast } = useUi();
   const current = useApp((s) => s.nutritionGoals);
-  const [g, setG] = useState<NutritionGoals>(current);
-  const macroKcal = macroCalories(g);
-  const pct = (kcal: number) => (macroKcal > 0 ? Math.round((kcal / macroKcal) * 100) : 0);
-
-  function applyPreset(p: (typeof PRESETS)[number]) {
-    setG((x) => ({
-      ...x,
-      carbs: Math.round((x.calories * p.c) / 100 / 4),
-      protein: Math.round((x.calories * p.p) / 100 / 4),
-      fat: Math.round((x.calories * p.f) / 100 / 9),
-    }));
-  }
+  // Goals saved before calories and macros were linked may not add up; the editor shows it and
+  // typing calories (or a macro) brings them back in line.
+  const [v, setV] = useState<CaloriesAndMacros>({ calories: current.calories, protein: current.protein, carbs: current.carbs, fat: current.fat });
+  const [allowance, setAllowance] = useState<number>(current.overAllowance ?? DEFAULT_OVER_ALLOWANCE);
+  const [editorKey, setEditorKey] = useState(0);
+  const valid = v.calories != null && v.calories >= 800 && macrosMatch(v);
 
   return (
     <Screen>
       <PageHeader title="Nutrition goals" onBack={pop} />
       <div className="space-y-4 px-4 pb-10">
-        <WeightGoalCard onUse={(n) => setG((x) => ({ ...x, ...n }))} />
         <Card>
-          <Field label="Daily calories">
-            <NumberInput value={g.calories} onChange={(v) => setG({ ...g, calories: Math.max(0, Math.round(v ?? 0)) })} suffix="kcal" step="1" />
-          </Field>
-          <div className="mt-4">
+          <div className="mb-3 text-sm font-semibold">Calories & macros</div>
+          <MacroEditor key={editorKey} value={v} onChange={setV} presets />
+
+          <div className="mt-5 border-t border-line pt-4">
             <Field
               label="Over-goal allowance"
               hint="A day stays green until you eat this many kcal more than your goal (plus exercise). Beyond that it turns red."
             >
-              <NumberInput
-                value={g.overAllowance ?? DEFAULT_OVER_ALLOWANCE}
-                onChange={(v) => setG({ ...g, overAllowance: Math.max(0, Math.round(v ?? 0)) })}
-                suffix="kcal"
-                step="1"
-              />
+              <NumberInput value={allowance} onChange={(x) => setAllowance(Math.max(0, Math.round(x ?? 0)))} suffix="kcal" step="1" />
             </Field>
             <div className="mt-2 flex gap-2">
               {[0, 50, 100, 200].map((n) => (
                 <button
                   key={n}
-                  onClick={() => setG({ ...g, overAllowance: n })}
-                  className={clsx(
-                    "flex-1 rounded-lg py-1.5 text-xs font-medium",
-                    (g.overAllowance ?? DEFAULT_OVER_ALLOWANCE) === n ? "bg-acc text-white" : "bg-surf2 text-tx2",
-                  )}
+                  onClick={() => setAllowance(n)}
+                  className={clsx("flex-1 rounded-lg py-1.5 text-xs font-medium", allowance === n ? "bg-acc text-white" : "bg-surf2 text-tx2")}
                 >
                   {n === 0 ? "Strict" : `±${n}`}
                 </button>
@@ -77,58 +57,21 @@ export function NutritionGoalsPage() {
             </div>
           </div>
         </Card>
-        <Card>
-          <div className="mb-3 flex items-center justify-between">
-            <div className="text-sm font-semibold">Macros (grams per day)</div>
-          </div>
-          <div className="mb-4 flex gap-2">
-            {PRESETS.map((p) => (
-              <button key={p.name} onClick={() => applyPreset(p)} className="flex-1 rounded-lg bg-surf2 px-2 py-2 text-xs font-medium text-tx2 active:bg-surf3">
-                {p.name}
-                <div className="text-[10px] text-tx3">
-                  {p.c}/{p.p}/{p.f}
-                </div>
-              </button>
-            ))}
-          </div>
-          <div className="space-y-3">
-            {(
-              [
-                ["carbs", "Carbs", 4],
-                ["protein", "Protein", 4],
-                ["fat", "Fat", 9],
-              ] as const
-            ).map(([k, label, kcalPerG]) => (
-              <div key={k} className="grid grid-cols-[1fr_7rem] items-center gap-3">
-                <div>
-                  <div className="flex items-center gap-1.5 font-medium">
-                    {label}
-                  </div>
-                  <div className="text-xs text-tx2">
-                    {fmt(g[k] * kcalPerG)} kcal · {pct(g[k] * kcalPerG)}%
-                  </div>
-                </div>
-                <NumberInput value={g[k]} onChange={(v) => setG({ ...g, [k]: Math.max(0, Math.round(v ?? 0)) })} suffix="g" step="1" />
-              </div>
-            ))}
-          </div>
-          {/* split bar */}
-          {macroKcal > 0 && (
-            <div className="mt-4 flex h-2.5 gap-0.5 overflow-hidden rounded-full">
-              <div style={{ width: `${pct(g.carbs * 4)}%`, background: C.carbs }} />
-              <div style={{ width: `${pct(g.protein * 4)}%`, background: C.protein }} />
-              <div style={{ width: `${pct(g.fat * 9)}%`, background: C.fat }} />
-            </div>
-          )}
-          <div className={clsx("mt-3 text-xs", Math.abs(macroKcal - g.calories) > g.calories * 0.05 ? "text-gold" : "text-tx2")}>
-            Macros add up to {fmt(macroKcal)} kcal
-            {Math.abs(macroKcal - g.calories) > g.calories * 0.05 && ` — ${fmt(Math.abs(macroKcal - g.calories))} kcal ${macroKcal > g.calories ? "over" : "under"} your calorie goal`}
-          </div>
-        </Card>
+
+        <WeightGoalCard
+          onUse={(n) => {
+            // Use the plan's split at its calories so the numbers add up exactly
+            const kcal = n.calories;
+            setV({ calories: kcal, ...macrosFor(kcal, splitOf(n)) });
+            setEditorKey((k) => k + 1);
+          }}
+        />
+
         <Button
           className="w-full"
+          disabled={!valid}
           onClick={() => {
-            useApp.getState().setNutritionGoals(g);
+            useApp.getState().setNutritionGoals({ calories: v.calories!, protein: v.protein, carbs: v.carbs, fat: v.fat, overAllowance: allowance });
             showToast("Goals saved");
             pop();
           }}
