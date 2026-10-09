@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { useApp } from "../store/app";
+import { buildPlan, goalBlocked, maxPace, type GoalType } from "../lib/plan";
 import { useUi } from "../store/ui";
 import type { ExerciseGoals, NutritionGoals } from "../types";
 import { addDays, dayNum, dowShort, fromKey, longDate, monthShort, todayKey, weekDays, weekStart, formatDuration } from "../lib/date";
@@ -42,6 +43,7 @@ export function NutritionGoalsPage() {
     <Screen>
       <PageHeader title="Nutrition goals" onBack={pop} />
       <div className="space-y-4 px-4 pb-10">
+        <WeightGoalCard onUse={(n) => setG((x) => ({ ...x, ...n }))} />
         <Card>
           <Field label="Daily calories">
             <NumberInput value={g.calories} onChange={(v) => setG({ ...g, calories: Math.max(0, Math.round(v ?? 0)) })} suffix="kcal" step="1" />
@@ -134,6 +136,94 @@ export function NutritionGoalsPage() {
         </Button>
       </div>
     </Screen>
+  );
+}
+
+/**
+ * Optional: pick lose / maintain / gain and get numbers worked out from your profile
+ * (same maths and safety rails as setup). Only fills the form below — nothing changes until Save.
+ */
+function WeightGoalCard({ onUse }: { onUse: (n: { calories: number; protein: number; carbs: number; fat: number }) => void }) {
+  const profile = useApp((s) => s.profile);
+  const push = useUi((s) => s.push);
+  const [goal, setGoal] = useState<GoalType>(profile?.goal ?? "maintain");
+  const [pace, setPace] = useState(profile?.pace ?? 0.5);
+
+  if (!profile) {
+    return (
+      <Card className="flex items-center gap-3">
+        <div className="flex-1 text-sm text-tx2">Want these worked out from your age, height and weight?</div>
+        <Button variant="secondary" className="h-9 text-sm" onClick={() => push({ kind: "onboarding" })}>
+          Set up
+        </Button>
+      </Card>
+    );
+  }
+
+  const p = { ...profile, goal, pace, activity: profile.activity ?? "light" };
+  const plan = buildPlan(p);
+  const max = maxPace(goal, profile.weightKg);
+  const paces = (goal === "lose" ? [0.25, 0.5, 0.75, 1] : [0.25, 0.5]).filter((x) => x <= max);
+  const OPTIONS: { id: GoalType; label: string }[] = [
+    { id: "lose", label: "Lose" },
+    { id: "maintain", label: "Maintain" },
+    { id: "gain", label: "Gain" },
+  ];
+
+  return (
+    <Card>
+      <div className="text-sm font-semibold">Weight goal <span className="font-normal text-tx3">· optional</span></div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {OPTIONS.map((o) => {
+          const blocked = goalBlocked(o.id, profile);
+          return (
+            <button
+              key={o.id}
+              disabled={!!blocked}
+              title={blocked ?? undefined}
+              onClick={() => {
+                setGoal(o.id);
+                setPace(o.id === "gain" ? 0.25 : 0.5);
+              }}
+              className={clsx("rounded-lg py-2 text-sm font-medium disabled:opacity-30", goal === o.id ? "bg-acc text-white" : "bg-surf2 text-tx2")}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+      {goal !== "maintain" && (
+        <div className="mt-2 flex gap-2">
+          {paces.map((x) => (
+            <button key={x} onClick={() => setPace(x)} className={clsx("flex-1 rounded-lg py-1.5 text-xs font-medium", pace === x ? "bg-surf3 text-tx" : "bg-surf2 text-tx2")}>
+              {x} kg/wk
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="mt-3 rounded-xl bg-surf2 px-3 py-2.5 text-sm">
+        <span className="font-semibold tabular-nums">{fmt(plan.calories)} kcal</span>
+        <span className="text-tx2">
+          {" "}
+          · P {plan.protein} g · C {plan.carbs} g · F {plan.fat} g
+        </span>
+      </div>
+      {plan.notes.map((n) => (
+        <p key={n} className="mt-2 text-xs text-gold">
+          {n}
+        </p>
+      ))}
+      <Button
+        variant="secondary"
+        className="mt-3 w-full"
+        onClick={() => {
+          onUse({ calories: plan.calories, protein: plan.protein, carbs: plan.carbs, fat: plan.fat });
+          useApp.getState().updateProfile({ goal, pace });
+        }}
+      >
+        Use these numbers
+      </Button>
+    </Card>
   );
 }
 

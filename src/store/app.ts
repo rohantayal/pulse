@@ -36,6 +36,7 @@ export interface AppState {
   /** Save the profile and the (possibly edited) targets from onboarding, and log today's weight. */
   completeOnboarding: (profile: Profile, targets: { nutrition: NutritionGoals; steps: number }) => void;
   dismissChecklist: () => void;
+  updateProfile: (patch: Partial<Profile>) => void;
 
   meals: MealDef[];
   customFoods: Food[];
@@ -191,6 +192,7 @@ export const useApp = create<AppState>()(
           };
         }),
       dismissChecklist: () => set({ checklistDismissed: true }),
+      updateProfile: (patch) => set((s) => (s.profile ? { profile: { ...s.profile, ...patch } } : {})),
 
       meals: DEFAULT_MEALS,
       customFoods: [],
