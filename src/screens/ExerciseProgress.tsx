@@ -36,6 +36,7 @@ export function ExerciseProgress({ exerciseId, onClose, overlay }: { exerciseId:
   const custom = useApp((s) => s.customExercises);
   const { unit, show } = useUnit();
   const [showAll, setShowAll] = useState(false);
+  const note = useApp((s) => s.exerciseNotes[exerciseId]);
   const exercise = useMemo(() => allExercises(custom).find((e) => e.id === exerciseId), [custom, exerciseId]);
 
   const sessions: Session[] = useMemo(() => {
@@ -112,6 +113,13 @@ export function ExerciseProgress({ exerciseId, onClose, overlay }: { exerciseId:
             </div>
           </div>
         </Card>
+
+        {note && (
+          <Card className="mt-3 border border-gold/20 bg-gold/5">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gold">Your note</div>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-tx">{note}</p>
+          </Card>
+        )}
 
         {/* How to */}
         {steps.length > 0 && (

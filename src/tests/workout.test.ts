@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Workout, WorkoutSet } from "../types";
-import { bestsFromSets, detectPRs, exerciseBests, exercisesVolume, oneRepMax, previousSets, recomputePrs, exerciseRecords } from "../lib/workout";
+import { bestsFromSets, detectPRs, exerciseBests, exercisesVolume, oneRepMax, previousSets, recomputePrs, exerciseRecords, bestSetsByPosition, lastSetsInRoutine } from "../lib/workout";
 
 const set = (kg: number | null, reps: number | null, done = true): WorkoutSet => ({ id: Math.random().toString(), kg, reps, done });
 
@@ -52,6 +52,22 @@ describe("previousSets", () => {
   });
 });
 
+describe("first session of an exercise", () => {
+  it("gives no PR even when a later set beats an earlier one", () => {
+    const first = workout(1, "bench", [set(60, 8), set(70, 8)]);
+    const out = recomputePrs([first]);
+    expect(out[0].exercises[0].sets.map((s) => s.pr)).toEqual([undefined, undefined]);
+    // in the live workout: history empty, set 1 done → set 2 still no PR
+    const bests = bestsFromSets([set(60, 8)], exerciseBests([], "bench"));
+    expect(detectPRs(set(70, 8), bests, false)).toEqual([]);
+  });
+  it("does give one in the second workout when you beat the first", () => {
+    const out = recomputePrs([workout(1, "bench", [set(60, 8)]), workout(2, "bench", [set(62.5, 8), set(65, 8)])]);
+    expect(out[1].exercises[0].sets[0].pr).toContain("weight");
+    expect(out[1].exercises[0].sets[1].pr).toContain("weight"); // beats set 1 of this workout too
+  });
+});
+
 describe("recomputePrs", () => {
   it("re-awards records in order after an edit", () => {
     const w1 = workout(1, "bench", [set(60, 8)]);
@@ -84,5 +100,20 @@ describe("exerciseRecords", () => {
     expect(r.mostRepsSet?.set.reps).toBe(12);
     expect(r.mostSessionReps).toMatchObject({ value: 22, workoutId: "a" });
     expect(r.bestSessionVolume).toMatchObject({ value: 1760, workoutId: "a" });
+  });
+});
+
+describe("Best column and routine hints", () => {
+  it("keeps the best ever set for each position", () => {
+    const h = [workout(1, "bench", [set(60, 10), set(60, 8)]), workout(2, "bench", [set(65, 6), set(55, 12), set(50, 12)])];
+    const best = bestSetsByPosition(h, "bench");
+    expect(best.map((s) => `${s.kg}x${s.reps}`)).toEqual(["60x10", "55x12", "50x12"]); // est. 1RM: 80 beats 78; 77 beats 76
+  });
+  it("uses the last session of this routine, else the last session anywhere", () => {
+    const a = { ...workout(1, "bench", [set(60, 8)]), routineId: "push" };
+    const b = { ...workout(2, "bench", [set(40, 15)]), routineId: "full" };
+    expect(lastSetsInRoutine([a, b], "bench", "push")[0].kg).toBe(60);
+    expect(lastSetsInRoutine([a, b], "bench", "legs")[0].kg).toBe(40);
+    expect(lastSetsInRoutine([a, b], "bench")[0].kg).toBe(40);
   });
 });

@@ -38,6 +38,9 @@ export interface AppState {
   profile: Profile | null;
   habits: Habit[];
   habitLog: HabitLog;
+  /** Notes per exercise (by exercise id), shown under its name in every workout */
+  exerciseNotes: Record<string, string>;
+  setExerciseNote: (exerciseId: string, note: string) => void;
   addHabit: (h: Omit<Habit, "id" | "createdAt">) => Habit;
   updateHabit: (id: string, patch: Partial<Omit<Habit, "id" | "createdAt" | "auto">>) => void;
   deleteHabit: (id: string) => void;
@@ -145,14 +148,14 @@ function mapSets(exs: WorkoutExercise[], weId: string, fn: (sets: WorkoutSet[]) 
 
 /** PRs for `set` given finished history plus the other completed sets of the same exercise in this workout. */
 function prsFor(state: AppState, we: WorkoutExercise, set: WorkoutSet): PrKind[] {
-  let bests = exerciseBests(state.workouts, we.exerciseId);
+  const history = exerciseBests(state.workouts, we.exerciseId);
   const others: WorkoutSet[] = [];
   for (const e of state.active?.exercises ?? []) {
     if (e.exerciseId !== we.exerciseId) continue;
     for (const s of e.sets) if (s.id !== set.id && s.done) others.push(s);
   }
-  bests = bestsFromSets(others, bests);
-  return detectPRs(set, bests);
+  // Earlier sets this workout raise the bar, but only an earlier *workout* makes a PR possible.
+  return detectPRs(set, bestsFromSets(others, history), history.any);
 }
 
 function defaultName(): string {
@@ -185,6 +188,14 @@ export const useApp = create<AppState>()(
       profile: null,
       habits: [],
       habitLog: {},
+      exerciseNotes: {},
+      setExerciseNote: (exerciseId, note) =>
+        set((s) => {
+          const exerciseNotes = { ...s.exerciseNotes };
+          if (note.trim()) exerciseNotes[exerciseId] = note.trim();
+          else delete exerciseNotes[exerciseId];
+          return { exerciseNotes };
+        }),
       addHabit: (input) => {
         const h: Habit = { ...input, name: input.name.trim(), id: uid(), createdAt: Date.now() };
         set((s) => ({ habits: [...s.habits, h] }));
@@ -244,7 +255,7 @@ export const useApp = create<AppState>()(
       routines: [],
       workouts: [],
       active: null,
-      settings: { prSound: true, restTimer: 90, autofillPrevious: true },
+      settings: { prSound: true, autofillPrevious: true },
 
       setDate: (date) => set({ selectedDate: date }),
 

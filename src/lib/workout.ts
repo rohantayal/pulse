@@ -66,8 +66,13 @@ export function exerciseBests(history: Workout[], exerciseId: string): Bests {
  * Which records does this set break? Only awarded when the exercise has history —
  * the very first time you do an exercise everything would be a "record", which is noise.
  */
-export function detectPRs(set: WorkoutSet, bests: Bests): PrKind[] {
-  if (!bests.any || !isCountable(set)) return [];
+/**
+ * `bests` is the bar to beat (history plus earlier sets this workout). `hasHistory` says whether
+ * the exercise was done in an earlier workout: without that there's nothing to beat, so no PR —
+ * not even when set 2 of your very first session beats set 1.
+ */
+export function detectPRs(set: WorkoutSet, bests: Bests, hasHistory = bests.any): PrKind[] {
+  if (!hasHistory || !bests.any || !isCountable(set)) return [];
   const kg = set.kg ?? 0;
   const reps = set.reps ?? 0;
   const prs: PrKind[] = [];
@@ -127,10 +132,12 @@ export function recomputePrs(workouts: Workout[]): Workout[] {
   const bests = new Map<string, Bests>();
   const updated = new Map<string, Workout>();
   for (const w of order) {
+    // eligibility comes only from earlier workouts, not earlier sets of this one
+    const hadHistory = new Map([...bests].map(([id, b]) => [id, b.any]));
     const exercises = w.exercises.map((e) => {
       let b = bests.get(e.exerciseId) ?? NO_BESTS;
       const sets = e.sets.map((s) => {
-        const pr = detectPRs(s, b);
+        const pr = detectPRs(s, b, hadHistory.get(e.exerciseId) ?? false);
         b = bestsFromSets([s], b);
         return { ...s, pr: pr.length ? pr : undefined };
       });
@@ -193,4 +200,34 @@ export function exerciseRecords(history: Workout[], exerciseId: string): Exercis
     if (volume > 0 && (!r.bestSessionVolume || volume > r.bestSessionVolume.value)) r.bestSessionVolume = { value: volume, date: w.date, workoutId: w.id };
   }
   return r;
+}
+
+const setScore = (s: WorkoutSet) => ((s.kg ?? 0) > 0 ? oneRepMax(s.kg ?? 0, s.reps ?? 0) : (s.reps ?? 0) / 1000);
+
+/**
+ * Lifetime best for each set position: index 0 is the best "set 1" you've ever done, and so on
+ * (best = highest est. 1RM, or most reps for body-weight moves).
+ */
+export function bestSetsByPosition(history: Workout[], exerciseId: string): WorkoutSet[] {
+  const best: WorkoutSet[] = [];
+  for (const w of history) {
+    const sets = w.exercises.filter((e) => e.exerciseId === exerciseId).flatMap((e) => e.sets.filter(isCountable));
+    sets.forEach((s, i) => {
+      if (!best[i] || setScore(s) > setScore(best[i])) best[i] = s;
+    });
+  }
+  return best;
+}
+
+/**
+ * What you did last time in this routine (for the kg/reps hints). Falls back to the last time
+ * you did the exercise anywhere when the routine has no history or it's an empty workout.
+ */
+export function lastSetsInRoutine(history: Workout[], exerciseId: string, routineId?: string): WorkoutSet[] {
+  if (routineId) {
+    const inRoutine = history.filter((w) => w.routineId === routineId);
+    const sets = previousSets(inRoutine, exerciseId);
+    if (sets.length) return sets;
+  }
+  return previousSets(history, exerciseId);
 }

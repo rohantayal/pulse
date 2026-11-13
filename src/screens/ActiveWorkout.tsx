@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, MoreHorizontal, Plus, Repeat, Settings, Timer, Trash2, TrendingUp, Trophy, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, MoreHorizontal, NotebookPen, Plus, Repeat, Settings, Trash2, TrendingUp, Trophy, X } from "lucide-react";
 import clsx from "clsx";
 import { allExercises, useApp, useUnit } from "../store/app";
 import { fromUnit, toUnit } from "../lib/units";
 import { useUi } from "../store/ui";
 import type { Exercise, PrKind, WorkoutExercise, WorkoutSet } from "../types";
-import { formatClock, formatDuration } from "../lib/date";
+import { formatDuration } from "../lib/date";
 import { fmt } from "../lib/format";
 import { latestWeight } from "../lib/nutrition";
-import { PR_LABEL, completedSets, estimateWorkoutCalories, exercisesVolume, formatSet, previousSets } from "../lib/workout";
-import { playPrChime, playRestDone } from "../lib/sound";
+import { PR_LABEL, bestSetsByPosition, completedSets, estimateWorkoutCalories, exercisesVolume, formatSet, lastSetsInRoutine } from "../lib/workout";
+import { playPrChime } from "../lib/sound";
 import { Button, Confirm, Field, NumberInput, Sheet, inputCls } from "../components/ui";
 import { ExercisePicker } from "./ExercisePicker";
 import { ExerciseProgress } from "./ExerciseProgress";
@@ -50,20 +50,9 @@ export function ActiveWorkout() {
   const [finishing, setFinishing] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [flash, setFlash] = useState<PrFlash | null>(null);
-  const [restEnd, setRestEnd] = useState<number | null>(null);
   const [infoFor, setInfoFor] = useState<string | null>(null);
 
   const byId = useMemo(() => new Map(allExercises(custom).map((e) => [e.id, e])), [custom]);
-
-  // Rest timer completion
-  const restLeft = restEnd ? Math.max(0, Math.ceil((restEnd - now) / 1000)) : 0;
-  useEffect(() => {
-    if (restEnd && restLeft === 0) {
-      setRestEnd(null);
-      playRestDone();
-      navigator.vibrate?.([120, 80, 120]);
-    }
-  }, [restEnd, restLeft]);
 
   useEffect(() => {
     if (!flash) return;
@@ -77,9 +66,10 @@ export function ActiveWorkout() {
   const sets = completedSets(active.exercises);
   const store = useApp.getState();
 
-  function tick(we: WorkoutExercise, s: WorkoutSet, prev?: WorkoutSet) {
+  /** `hint` = what you did last time in this routine; ticking an empty set uses it. */
+  function tick(we: WorkoutExercise, s: WorkoutSet, hint?: WorkoutSet) {
     const wasDone = s.done;
-    const fill = settings.autofillPrevious && prev ? { kg: prev.kg, reps: prev.reps } : undefined;
+    const fill = settings.autofillPrevious && hint ? { kg: hint.kg, reps: hint.reps } : undefined;
     const prs = store.toggleSet(we.id, s.id, fill);
     const after = useApp.getState().active?.exercises.find((e) => e.id === we.id)?.sets.find((x) => x.id === s.id);
     if (!wasDone && !after?.done) {
@@ -93,7 +83,6 @@ export function ActiveWorkout() {
       navigator.vibrate?.([30, 40, 60]);
       setFlash({ key: Date.now(), exercise: byId.get(we.exerciseId)?.name ?? "", set: after, kinds: prs });
     }
-    if (settings.restTimer > 0) setRestEnd(Date.now() + settings.restTimer * 1000);
   }
 
   return (
@@ -133,7 +122,8 @@ export function ActiveWorkout() {
               key={we.id}
               we={we}
               exercise={byId.get(we.exerciseId)}
-              previous={previousSets(workouts, we.exerciseId)}
+              best={bestSetsByPosition(workouts, we.exerciseId)}
+              last={lastSetsInRoutine(workouts, we.exerciseId, active.routineId)}
               onTick={tick}
               onMenu={() => setMenuFor(we)}
               onInfo={() => setInfoFor(we.exerciseId)}
@@ -156,27 +146,6 @@ export function ActiveWorkout() {
           </div>
         </div>
 
-        {/* Rest timer */}
-        {restEnd && restLeft > 0 && (
-          <div className="pb-safe absolute inset-x-0 bottom-0 mx-auto max-w-md px-4 pb-4">
-            <div className="flex items-center gap-3 rounded-2xl bg-surf2 p-3 shadow-2xl shadow-black">
-              <Timer size={20} className="text-acc" />
-              <div className="flex-1">
-                <div className="text-xs text-tx2">Rest</div>
-                <div className="text-xl font-bold tabular-nums">{formatClock(restLeft)}</div>
-              </div>
-              <button onClick={() => setRestEnd((e) => (e ? Math.max(Date.now() + 1000, e - 15000) : e))} className="rounded-lg bg-surf3 px-3 py-2 text-sm font-semibold">
-                −15
-              </button>
-              <button onClick={() => setRestEnd((e) => (e ? e + 15000 : e))} className="rounded-lg bg-surf3 px-3 py-2 text-sm font-semibold">
-                +15
-              </button>
-              <button onClick={() => setRestEnd(null)} className="rounded-lg bg-acc px-3 py-2 text-sm font-semibold text-white">
-                Skip
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {infoFor && <ExerciseProgress exerciseId={infoFor} overlay onClose={() => setInfoFor(null)} />}
@@ -296,7 +265,8 @@ function TopStat({ label, value, accent }: { label: string; value: string; accen
 function ExerciseBlock({
   we,
   exercise,
-  previous,
+  best,
+  last,
   onTick,
   onMenu,
   onSetMenu,
@@ -304,8 +274,11 @@ function ExerciseBlock({
 }: {
   we: WorkoutExercise;
   exercise?: Exercise;
-  previous: WorkoutSet[];
-  onTick: (we: WorkoutExercise, s: WorkoutSet, prev?: WorkoutSet) => void;
+  /** lifetime best per set position (the BEST column) */
+  best: WorkoutSet[];
+  /** last time in this routine, per set (kg/reps hints) */
+  last: WorkoutSet[];
+  onTick: (we: WorkoutExercise, s: WorkoutSet, hint?: WorkoutSet) => void;
   onMenu: () => void;
   onSetMenu: (s: WorkoutSet, n: number) => void;
   onInfo: () => void;
@@ -328,10 +301,12 @@ function ExerciseBlock({
         </button>
       </div>
 
-      {/* SET | PREVIOUS | KG | REPS | ✓ */}
+      {exercise && <ExerciseNote exerciseId={exercise.id} />}
+
+      {/* SET | BEST | KG | REPS | ✓ */}
       <div className="grid grid-cols-[2.25rem_1fr_4.5rem_4rem_2.5rem] items-center gap-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-tx3">
         <div className="text-center">Set</div>
-        <div>Previous</div>
+        <div>Best</div>
         <div className="text-center">{unit}</div>
         <div className="text-center">Reps</div>
         <div className="flex justify-center">
@@ -341,7 +316,8 @@ function ExerciseBlock({
 
       <div className="mt-1 space-y-1">
         {we.sets.map((s, i) => {
-          const prev = previous[i];
+          const top = best[i];
+          const prev = last[i];
           const pr = s.done && s.pr && s.pr.length > 0;
           return (
             <div
@@ -355,11 +331,11 @@ function ExerciseBlock({
                 {pr ? <Trophy size={16} className="text-gold" fill="#f5c542" /> : i + 1}
               </button>
               <button
-                onClick={() => prev && store.updateSet(we.id, s.id, { kg: prev.kg, reps: prev.reps })}
+                onClick={() => top && store.updateSet(we.id, s.id, { kg: top.kg, reps: top.reps })}
                 className="truncate text-left text-sm text-tx2"
-                title="Tap to copy"
+                title="Your best for this set — tap to copy"
               >
-                {prev ? formatSet(prev, unit) : "–"}
+                {top ? formatSet(top, unit) : "–"}
               </button>
               <SetInput
                 value={s.kg == null ? null : toUnit(s.kg, unit)}
@@ -472,23 +448,10 @@ function WorkoutSettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <Sheet open={open} onClose={onClose} title="Workout settings">
       <div className="space-y-5">
-        <Field label="Rest timer after each set">
-          <div className="grid grid-cols-5 gap-2">
-            {[0, 60, 90, 120, 180].map((sec) => (
-              <button
-                key={sec}
-                onClick={() => setSettings({ restTimer: sec })}
-                className={clsx("rounded-lg py-2 text-sm font-medium", settings.restTimer === sec ? "bg-acc text-white" : "bg-surf2 text-tx2")}
-              >
-                {sec === 0 ? "Off" : formatClock(sec)}
-              </button>
-            ))}
-          </div>
-        </Field>
         <Toggle label="PR sound" hint="Play a chime when you set a new personal record" on={settings.prSound} onChange={(v) => setSettings({ prSound: v })} />
         <Toggle
-          label="Auto-fill from previous"
-          hint="Ticking an empty set uses last time's weight and reps"
+          label="Auto-fill from last time"
+          hint="Ticking an empty set uses what you did last time in this routine"
           on={settings.autofillPrevious}
           onChange={(v) => setSettings({ autofillPrevious: v })}
         />
@@ -570,5 +533,46 @@ function Mini({ label, value, gold }: { label: string; value: string; gold?: boo
       <div className={clsx("text-[15px] font-semibold tabular-nums", gold && "text-gold")}>{value}</div>
       <div className="text-[11px] text-tx2">{label}</div>
     </div>
+  );
+}
+
+/**
+ * A note that belongs to the exercise, not this workout: grip, seat height, a cue — it shows
+ * under the name every time you do the exercise until you change it.
+ */
+function ExerciseNote({ exerciseId }: { exerciseId: string }) {
+  const note = useApp((s) => s.exerciseNotes[exerciseId] ?? "");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(note);
+  const save = () => {
+    useApp.getState().setExerciseNote(exerciseId, draft);
+    setEditing(false);
+  };
+  if (editing) {
+    return (
+      <div className="-mt-1 mb-3">
+        <textarea
+          autoFocus
+          rows={2}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={save}
+          placeholder="e.g. Seat on 4 · slow on the way down"
+          className="w-full resize-none rounded-lg bg-surf2 px-3 py-2 text-sm text-tx outline-none ring-acc placeholder:text-tx3 focus:ring-2"
+        />
+      </div>
+    );
+  }
+  return (
+    <button
+      onClick={() => {
+        setDraft(note);
+        setEditing(true);
+      }}
+      className={clsx("-mt-1 mb-3 flex w-full items-start gap-1.5 text-left text-sm", note ? "rounded-lg bg-gold/10 px-3 py-2 text-tx" : "text-tx3")}
+    >
+      <NotebookPen size={14} className={clsx("mt-0.5 shrink-0", note ? "text-gold" : "")} />
+      <span className="whitespace-pre-wrap">{note || "Add a note"}</span>
+    </button>
   );
 }

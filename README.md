@@ -71,12 +71,16 @@ Re-run any time from Settings → Set up my plan again.
 **Workouts**
 - Routines: create/edit/delete, set count and rep range per exercise, start with one tap; starter templates
   (Full Body, Push, Pull, Legs, Upper, Lower) offered in setup and on an empty Routines page
-- Live workout: Duration · Volume · Sets header; per exercise a SET | PREVIOUS | KG | REPS | ✓ table.
-  KG/REPS placeholders show what you did last time; tapping PREVIOUS copies it; ticking an empty set uses it.
-- + Add set, + Add exercise (65 preloaded exercises + your own), replace/reorder/remove, rest timer,
+- Live workout: Duration · Volume · Sets header; per exercise a SET | BEST | KG | REPS | ✓ table.
+  BEST is your lifetime best for that set position (tap to copy); the KG/REPS hints are what you did last
+  time in this routine (or anywhere, if the routine has no history), and ticking an empty set uses them.
+- Exercise notes: a note under each exercise's name (grip, seat height, a cue) that stays with the
+  exercise and shows every time you do it; also on the exercise's ⓘ page.
+- + Add set, + Add exercise (65 preloaded exercises + your own), replace/reorder/remove,
   Settings, Discard workout, Finish (calorie estimate you can edit).
 - New personal records (heaviest weight, best est. 1RM, best set volume, most reps for body-weight moves)
-  trigger a golden trophy and a chime. PRs are only awarded once an exercise has history.
+  trigger a golden trophy and a chime. PRs only count against earlier workouts: the first time you do an
+  exercise there's nothing to beat, so no trophy even if set 2 beats set 1.
 - Previous workouts: history grouped by month, detail view, save as routine, delete.
 - Every exercise shows a small body sketch with its muscles in red (main muscles solid, helpers lighter) and
   the main muscle by name. The ⓘ next to an exercise opens its page: an animated sketch of the movement,

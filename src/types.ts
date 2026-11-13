@@ -139,8 +139,6 @@ export interface Routine {
 
 export interface WorkoutSettings {
   prSound: boolean;
-  /** Seconds; 0 = off */
-  restTimer: number;
   /** Fill kg/reps from the "previous" placeholder when ticking an empty set */
   autofillPrevious: boolean;
 }
