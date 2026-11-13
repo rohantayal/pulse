@@ -4,18 +4,18 @@ import clsx from "clsx";
 import { useApp } from "../store/app";
 import { useUi } from "../store/ui";
 import type { Habit } from "../types";
-import { AUTO_HABITS, bestStreak, completionRate, isDue, progress, scheduleLabel, streak, type DayData } from "../lib/habits";
+import { AUTO_HABITS, HABIT_EMOJIS, bestStreak, completionRate, habitEmoji, isDue, progress, scheduleLabel, streak, type DayData } from "../lib/habits";
 import { addDays, dayNum, longDate, monthShort, todayKey, weekStart } from "../lib/date";
 import { Button, Card, Confirm, Field, NumberInput, PageHeader, Screen, SectionTitle, inputCls } from "../components/ui";
 
 /** Ideas for your own habits — they only fill in the form. */
-const IDEAS: { name: string; target: number; unit?: string }[] = [
-  { name: "Drink water", target: 8, unit: "glasses" },
-  { name: "Read 10 pages", target: 1 },
-  { name: "Sleep 8 hours", target: 1 },
-  { name: "Meditate", target: 1 },
-  { name: "No sugar", target: 1 },
-  { name: "Walk 20 minutes", target: 1 },
+const IDEAS: { name: string; target: number; unit?: string; emoji: string }[] = [
+  { name: "Drink water", target: 8, unit: "glasses", emoji: "💧" },
+  { name: "Read 10 pages", target: 1, emoji: "📖" },
+  { name: "Sleep 8 hours", target: 1, emoji: "😴" },
+  { name: "Meditate", target: 1, emoji: "🧘" },
+  { name: "No sugar", target: 1, emoji: "🍬" },
+  { name: "Walk 20 minutes", target: 1, emoji: "🚶" },
 ];
 
 // Mon … Sun, as JS weekday numbers
@@ -32,6 +32,9 @@ export function HabitEditor({ habitId }: { habitId?: string }) {
   const [target, setTarget] = useState<number | null>(existing && existing.target > 1 ? existing.target : 8);
   const [unit, setUnit] = useState(existing?.unit ?? "");
   const [days, setDays] = useState<number[]>(existing?.days ?? []);
+  // undefined = follow the name (💧 for "water"…) until you pick one yourself
+  const [emoji, setEmoji] = useState<string | undefined>(existing?.emoji);
+  const shownEmoji = habitEmoji({ emoji, name, auto: existing?.auto });
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const unusedAuto = AUTO_HABITS.filter((a) => !habits.some((h) => h.auto === a.auto));
@@ -45,7 +48,7 @@ export function HabitEditor({ habitId }: { habitId?: string }) {
 
   function save() {
     if (!valid) return;
-    const fields = { name: name.trim(), target: existing?.auto ? 1 : counted ? Math.round(target!) : 1, unit: counted ? unit.trim() || undefined : undefined, days };
+    const fields = { name: name.trim(), emoji, target: existing?.auto ? 1 : counted ? Math.round(target!) : 1, unit: counted ? unit.trim() || undefined : undefined, days };
     if (existing) useApp.getState().updateHabit(existing.id, fields);
     else useApp.getState().addHabit(fields);
     showToast(existing ? "Habit updated" : "Habit added");
@@ -70,16 +73,14 @@ export function HabitEditor({ habitId }: { habitId?: string }) {
             <Card className="divide-y divide-line p-0">
               {unusedAuto.map((a) => (
                 <div key={a.auto} className="flex items-center gap-3 px-4 py-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-acc/15 text-acc">
-                    <Zap size={15} />
-                  </span>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surf2 text-lg">{a.emoji}</span>
                   <div className="min-w-0 flex-1">
                     <div className="font-medium">{a.name}</div>
                     <div className="text-xs text-tx3">{a.hint}</div>
                   </div>
                   <button
                     onClick={() => {
-                      useApp.getState().addHabit({ name: a.name, auto: a.auto, target: 1, days: [] });
+                      useApp.getState().addHabit({ name: a.name, auto: a.auto, emoji: a.emoji, target: 1, days: [] });
                       showToast(`Added “${a.name}”`);
                     }}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surf2 text-acc"
@@ -108,6 +109,7 @@ export function HabitEditor({ habitId }: { habitId?: string }) {
                     setCounted(i.target > 1);
                     if (i.target > 1) setTarget(i.target);
                     setUnit(i.unit ?? "");
+                    setEmoji(i.emoji);
                   }}
                   className="rounded-full bg-surf2 px-3 py-1.5 text-xs text-tx2 active:bg-surf3"
                 >
@@ -116,6 +118,22 @@ export function HabitEditor({ habitId }: { habitId?: string }) {
               ))}
             </div>
           )}
+
+          <Field label="Icon">
+            <div className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
+              {[...new Set([shownEmoji, ...HABIT_EMOJIS])].map((e) => (
+                <button
+                  key={e}
+                  onClick={() => setEmoji(e)}
+                  aria-label={`Icon ${e}`}
+                  aria-pressed={e === shownEmoji}
+                  className={clsx("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl", e === shownEmoji ? "bg-acc/20 ring-2 ring-acc" : "bg-surf2")}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </Field>
 
           {!existing?.auto && (
             <Field label="Type">
@@ -229,7 +247,7 @@ export function HabitDetail({ habitId }: { habitId: string }) {
   return (
     <Screen>
       <PageHeader
-        title={h.name}
+        title={`${habitEmoji(h)}  ${h.name}`}
         subtitle={h.auto ? "Ticks itself" : `${scheduleLabel(h)}${h.target > 1 ? ` · ${h.target} ${h.unit ?? "times"} a day` : ""}`}
         onBack={pop}
         right={
@@ -244,6 +262,8 @@ export function HabitDetail({ habitId }: { habitId: string }) {
             <Zap size={16} className="shrink-0 text-acc" /> {auto.hint}.
           </Card>
         )}
+        {!h.auto && isDue(h, today) && <TodayControl habit={h} count={progress(h, today, log, data).count} />}
+
         <div className="grid grid-cols-3 gap-2">
           <Stat label="Current streak" value={`${cur}`} unit={cur === 1 ? "day" : "days"} />
           <Stat label="Best streak" value={`${best}`} unit={best === 1 ? "day" : "days"} />
@@ -327,5 +347,36 @@ function Legend({ className, label }: { className: string; label: string }) {
       <span className={clsx("h-2.5 w-2.5 rounded-[3px]", className)} />
       {label}
     </span>
+  );
+}
+
+/** Today's progress for your own habit, with − / + to correct a count. */
+function TodayControl({ habit, count }: { habit: Habit; count: number }) {
+  const today = todayKey();
+  const set = (n: number) => useApp.getState().setHabitCount(today, habit.id, Math.max(0, n));
+  const done = count >= habit.target;
+  return (
+    <Card className="mb-3 flex items-center gap-3">
+      <div className="flex-1">
+        <div className="text-xs text-tx3">Today</div>
+        <div className={clsx("text-lg font-semibold", done && "text-good")}>
+          {habit.target > 1 ? `${count} / ${habit.target} ${habit.unit ?? ""}`.trim() : done ? "Done" : "Not done yet"}
+        </div>
+      </div>
+      {habit.target > 1 ? (
+        <div className="flex items-center gap-2">
+          <button onClick={() => set(count - 1)} disabled={count === 0} className="flex h-10 w-10 items-center justify-center rounded-full bg-surf2 text-xl disabled:opacity-30" aria-label="One less">
+            −
+          </button>
+          <button onClick={() => set(count + 1)} className="flex h-10 w-10 items-center justify-center rounded-full bg-acc text-xl text-white" aria-label="One more">
+            +
+          </button>
+        </div>
+      ) : (
+        <Button variant={done ? "secondary" : "primary"} className="h-10" onClick={() => set(done ? 0 : 1)}>
+          {done ? "Undo" : "Mark done"}
+        </Button>
+      )}
+    </Card>
   );
 }

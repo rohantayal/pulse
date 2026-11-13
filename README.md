@@ -50,7 +50,11 @@ Re-run any time from Settings → Set up my plan again.
 - Exercise: the day's workouts; body weight; a "Getting started" checklist for new users
 
 **Habits (on Today, under Calories)**
-- Tick habits (one tap) or count habits ("8 glasses": each tap +1, − to undo), every day or on chosen days.
+- Shown as one sideways-scrolling row of rings with an emoji each (picked from the name, or your choice):
+  tap a ring to tick, tap the name under it (or hold the ring) to open the habit. Header shows done/due
+  and a small progress bar.
+- Tick habits (one tap) or count habits ("8 glasses": each tap +1, −/+ on the habit's page to correct),
+  every day or on chosen days.
 - Self-ticking habits that follow what you log: Work out, Hit protein goal, Log every meal, Stay within calories.
 - Streaks (🔥) on each habit; tap a habit for current/best streak, last-30-days completion and a 12-week grid.
 - Add from the + button or the + next to "Habits"; edit or delete from the habit's page.

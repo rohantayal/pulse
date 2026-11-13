@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FoodLogEntry, Habit, HabitLog, Workout } from "../types";
-import { autoDone, bestStreak, completionRate, isDue, progress, scheduleLabel, streak, type DayData } from "../lib/habits";
+import { autoDone, bestStreak, completionRate, habitEmoji, isDue, progress, scheduleLabel, shortName, streak, type DayData } from "../lib/habits";
 
 const created = new Date(2026, 9, 1).getTime(); // 1 Oct 2026, a Thursday
 const habit = (p: Partial<Habit> = {}): Habit => ({ id: "h", name: "Read", target: 1, days: [], createdAt: created, ...p });
@@ -53,5 +53,22 @@ describe("habits", () => {
     expect(autoDone("meals", "2026-10-02", d)).toBe(true);
     expect(autoDone("calories", "2026-10-02", d)).toBe(true); // 1900 within 2000 + 300
     expect(autoDone("calories", "2026-10-03", d)).toBe(false); // one snack isn't a day of eating
+  });
+});
+
+describe("habit icons and labels", () => {
+  it("guesses an emoji from the name, and uses yours when set", () => {
+    expect(habitEmoji({ name: "Drink water" })).toBe("💧");
+    expect(habitEmoji({ name: "Read 10 pages" })).toBe("📖");
+    expect(habitEmoji({ name: "Something else" })).toBe("⭐");
+    expect(habitEmoji({ name: "Drink water", emoji: "🥤" })).toBe("🥤");
+    expect(habitEmoji({ name: "Work out", auto: "workout" })).toBe("💪");
+  });
+  it("shortens names for under a ring", () => {
+    expect(shortName("Drink water")).toBe("Drink");
+    expect(shortName("No sugar")).toBe("No sugar");
+    expect(shortName("Meditate")).toBe("Meditate");
+    expect(shortName("Log every meal", "meals")).toBe("Meals");
+    expect(shortName("My meals", "meals")).toBe("My meals"); // renamed: use their words
   });
 });

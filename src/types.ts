@@ -159,6 +159,8 @@ export interface Habit {
   target: number;
   /** e.g. "glasses" for a count habit */
   unit?: string;
+  /** Icon shown on the habit ring; a sensible default is picked from the name when unset. */
+  emoji?: string;
   /** Days it's due, 0 = Sunday … 6 = Saturday. Empty = every day. */
   days: number[];
   createdAt: number;

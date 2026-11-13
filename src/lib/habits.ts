@@ -2,12 +2,54 @@ import type { AutoHabit, FoodLogEntry, Habit, HabitLog, NutritionGoals, Workout 
 import { addDays, fromKey, todayKey } from "./date";
 import { calorieStatus, sumEntries } from "./nutrition";
 
-export const AUTO_HABITS: { auto: AutoHabit; name: string; hint: string }[] = [
-  { auto: "workout", name: "Work out", hint: "Ticks when you finish a workout" },
-  { auto: "protein", name: "Hit protein goal", hint: "Ticks when you reach your daily protein" },
-  { auto: "meals", name: "Log every meal", hint: "Ticks when breakfast, lunch and dinner all have food" },
-  { auto: "calories", name: "Stay within calories", hint: "Ticks on a green day" },
+export const AUTO_HABITS: { auto: AutoHabit; name: string; short: string; hint: string; emoji: string }[] = [
+  { auto: "workout", name: "Work out", short: "Workout", hint: "Ticks when you finish a workout", emoji: "💪" },
+  { auto: "protein", name: "Hit protein goal", short: "Protein", hint: "Ticks when you reach your daily protein", emoji: "🥩" },
+  { auto: "meals", name: "Log every meal", short: "Meals", hint: "Ticks when breakfast, lunch and dinner all have food", emoji: "🍽️" },
+  { auto: "calories", name: "Stay within calories", short: "Calories", hint: "Ticks on a green day", emoji: "✅" },
 ];
+
+/** Emojis offered in the habit editor. */
+export const HABIT_EMOJIS = ["💧", "📖", "😴", "🧘", "🚶", "🏃", "🍬", "🥗", "🍎", "☕", "🚭", "🍺", "📵", "💊", "🦷", "🧴", "✍️", "🎸", "🧠", "🙏", "🌅", "🧹", "💰", "⭐"];
+
+const KEYWORD_EMOJI: [RegExp, string][] = [
+  [/water|hydrat/i, "💧"],
+  [/read|book|page/i, "📖"],
+  [/sleep|bed/i, "😴"],
+  [/meditat|breath|mindful/i, "🧘"],
+  [/walk|step/i, "🚶"],
+  [/run|jog|cardio/i, "🏃"],
+  [/sugar|sweet|dessert/i, "🍬"],
+  [/veg|salad|fruit/i, "🥗"],
+  [/coffee|caffeine/i, "☕"],
+  [/smok|cigar/i, "🚭"],
+  [/alcohol|drink|beer/i, "🍺"],
+  [/phone|screen|social/i, "📵"],
+  [/vitamin|pill|supplement|creatine/i, "💊"],
+  [/floss|teeth|brush/i, "🦷"],
+  [/skin|sunscreen/i, "🧴"],
+  [/journal|write|diary/i, "✍️"],
+  [/pray|gratitude|thank/i, "🙏"],
+  [/stretch|yoga/i, "🧘"],
+  [/save|money|spend/i, "💰"],
+];
+
+/** The habit's icon: its own emoji, or one guessed from the name. */
+export function habitEmoji(h: Pick<Habit, "emoji" | "name" | "auto">): string {
+  if (h.emoji) return h.emoji;
+  if (h.auto) return AUTO_HABITS.find((a) => a.auto === h.auto)!.emoji;
+  return KEYWORD_EMOJI.find(([re]) => re.test(h.name))?.[1] ?? "⭐";
+}
+
+/** A short label for under a ring: the first word, or two short ones ("No sugar"). */
+export function shortName(name: string, auto?: AutoHabit): string {
+  const a = auto && AUTO_HABITS.find((x) => x.auto === auto);
+  // a self-ticking habit you haven't renamed gets its tidy label
+  if (a && a.name === name.trim()) return a.short;
+  const words = name.trim().split(/\s+/);
+  if (words.length > 1 && words[0].length <= 3) return `${words[0]} ${words[1]}`;
+  return words[0] ?? name;
+}
 
 export interface DayData {
   foodLog: FoodLogEntry[];
