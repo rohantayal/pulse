@@ -17,7 +17,9 @@ export type Page =
   | { kind: "exerciseGoals" }
   | { kind: "exerciseWeekly" }
   | { kind: "onboarding" }
-  | { kind: "settings" };
+  | { kind: "settings" }
+  | { kind: "habitEditor"; habitId?: string }
+  | { kind: "habitDetail"; habitId: string };
 
 interface UiState {
   tab: Tab;

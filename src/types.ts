@@ -144,3 +144,25 @@ export interface WorkoutSettings {
   /** Fill kg/reps from the "previous" placeholder when ticking an empty set */
   autofillPrevious: boolean;
 }
+
+// ---------- Habits ----------
+
+/** Habits that tick themselves from data the app already has. */
+export type AutoHabit = "workout" | "protein" | "meals" | "calories";
+
+export interface Habit {
+  id: string;
+  name: string;
+  /** Set for self-ticking habits; they can't be ticked by hand. */
+  auto?: AutoHabit;
+  /** Taps needed to complete the day (1 = a simple tick). */
+  target: number;
+  /** e.g. "glasses" for a count habit */
+  unit?: string;
+  /** Days it's due, 0 = Sunday … 6 = Saturday. Empty = every day. */
+  days: number[];
+  createdAt: number;
+}
+
+/** date (YYYY-MM-DD) → habit id → count done that day */
+export type HabitLog = Record<string, Record<string, number>>;

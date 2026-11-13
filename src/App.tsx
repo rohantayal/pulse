@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Apple, BarChart3, Settings as SettingsIcon, CalendarCheck, ClipboardList, Dumbbell, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
+import { Apple, BarChart3, ListChecks, Settings as SettingsIcon, CalendarCheck, ClipboardList, Dumbbell, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
 import clsx from "clsx";
 import { useApp, useHydrated } from "./store/app";
 import { useUi, type Page, type Tab } from "./store/ui";
@@ -16,6 +16,7 @@ import { Onboarding } from "./screens/Onboarding";
 import { WorkoutEditor } from "./screens/WorkoutEditor";
 import { ExerciseProgress } from "./screens/ExerciseProgress";
 import { SettingsPage } from "./screens/Settings";
+import { HabitDetail, HabitEditor } from "./screens/Habits";
 import { Sheet } from "./components/ui";
 import type { Meal } from "./types";
 
@@ -120,6 +121,10 @@ function PageView({ page }: { page: Page }) {
       return <ExerciseWeeklyPage />;
     case "settings":
       return <SettingsPage />;
+    case "habitEditor":
+      return <HabitEditor habitId={page.habitId} />;
+    case "habitDetail":
+      return <HabitDetail habitId={page.habitId} />;
     case "onboarding":
       return (
         <Onboarding
@@ -214,9 +219,19 @@ function AddSheet() {
   return (
     <Sheet open={open} onClose={close} title={mode === "choose" ? "Add" : mode === "workout" ? "Start a workout" : "Log food"}>
       {mode === "choose" && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           <BigChoice icon={<Dumbbell size={28} />} label="Workout" sub={active ? "Resume current" : "Routine or empty"} color="#3987e5" onClick={() => (active ? start() : setMode("workout"))} />
           <BigChoice icon={<Utensils size={28} />} label="Food" sub="Log a meal" color="#3fb96b" onClick={() => setMode("food")} />
+          <BigChoice
+            icon={<ListChecks size={28} />}
+            label="Habit"
+            sub="Something to do daily"
+            color="#f5c542"
+            onClick={() => {
+              close();
+              push({ kind: "habitEditor" });
+            }}
+          />
         </div>
       )}
       {mode === "workout" && (
@@ -265,7 +280,7 @@ function AddSheet() {
 
 function BigChoice({ icon, label, sub, color, onClick }: { icon: React.ReactNode; label: string; sub: string; color: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex flex-col items-center gap-2 rounded-2xl bg-surf2 px-3 py-6 active:bg-surf3">
+    <button onClick={onClick} className="flex flex-col items-center gap-2 rounded-2xl bg-surf2 px-2 py-5 text-center active:bg-surf3">
       <div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: `${color}26`, color }}>
         {icon}
       </div>

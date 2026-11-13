@@ -7,6 +7,8 @@ import type {
   ExerciseGoals,
   Food,
   FoodLogEntry,
+  Habit,
+  HabitLog,
   Meal,
   MealDef,
   NutritionGoals,
@@ -34,6 +36,14 @@ export interface AppState {
   selectedDate: string;
 
   profile: Profile | null;
+  habits: Habit[];
+  habitLog: HabitLog;
+  addHabit: (h: Omit<Habit, "id" | "createdAt">) => Habit;
+  updateHabit: (id: string, patch: Partial<Omit<Habit, "id" | "createdAt" | "auto">>) => void;
+  deleteHabit: (id: string) => void;
+  /** Set how many times a habit was done on a date (0 clears it). */
+  setHabitCount: (date: string, id: string, count: number) => void;
+
   /** Display unit for weights. Everything is stored in kg. */
   unit: WeightUnit;
   setUnit: (u: WeightUnit) => void;
@@ -163,6 +173,8 @@ const RESTORE_DEFAULTS = {
   weights: [],
   customExercises: [],
   workouts: [],
+  habits: [],
+  habitLog: {},
 };
 
 export const useApp = create<AppState>()(
@@ -171,6 +183,33 @@ export const useApp = create<AppState>()(
       selectedDate: todayKey(),
 
       profile: null,
+      habits: [],
+      habitLog: {},
+      addHabit: (input) => {
+        const h: Habit = { ...input, name: input.name.trim(), id: uid(), createdAt: Date.now() };
+        set((s) => ({ habits: [...s.habits, h] }));
+        return h;
+      },
+      updateHabit: (id, patch) => set((s) => ({ habits: s.habits.map((h) => (h.id === id ? { ...h, ...patch } : h)) })),
+      deleteHabit: (id) =>
+        set((s) => {
+          const habitLog: HabitLog = {};
+          for (const [date, row] of Object.entries(s.habitLog)) {
+            const { [id]: _gone, ...rest } = row;
+            void _gone;
+            if (Object.keys(rest).length) habitLog[date] = rest;
+          }
+          return { habits: s.habits.filter((h) => h.id !== id), habitLog };
+        }),
+      setHabitCount: (date, id, count) =>
+        set((s) => {
+          const row = { ...(s.habitLog[date] ?? {}) };
+          if (count > 0) row[id] = count;
+          else delete row[id];
+          const habitLog = { ...s.habitLog, [date]: row };
+          if (!Object.keys(row).length) delete habitLog[date];
+          return { habitLog };
+        }),
       unit: "kg",
       setUnit: (unit) => set({ unit }),
       onboarded: false,

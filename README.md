@@ -49,7 +49,13 @@ Re-run any time from Settings → Set up my plan again.
   meal, macro balance, protein). Other meals never change it.
 - Exercise: the day's workouts; body weight; a "Getting started" checklist for new users
 
-**Bottom bar:** Previous workouts · Workout routines · **Today** (pill) · My Foods · **+** (Workout or Food)
+**Habits (on Today, under Calories)**
+- Tick habits (one tap) or count habits ("8 glasses": each tap +1, − to undo), every day or on chosen days.
+- Self-ticking habits that follow what you log: Work out, Hit protein goal, Log every meal, Stay within calories.
+- Streaks (🔥) on each habit; tap a habit for current/best streak, last-30-days completion and a 12-week grid.
+- Add from the + button or the + next to "Habits"; edit or delete from the habit's page.
+
+**Bottom bar:** Previous workouts · Workout routines · **Today** (pill) · My Foods · **+** (Workout, Food or Habit)
 
 **Menu**
 - Settings (kg/lb, backup export/restore, set up my plan again)
