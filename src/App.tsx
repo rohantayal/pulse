@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Apple, BarChart3, ListChecks, Settings as SettingsIcon, CalendarCheck, ClipboardList, Dumbbell, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
 import clsx from "clsx";
 import { useApp, useHydrated } from "./store/app";
+import { startReminders } from "./lib/reminders";
 import { useUi, type Page, type Tab } from "./store/ui";
 import { formatDuration, todayKey } from "./lib/date";
 import { Home } from "./screens/Home";
@@ -14,6 +15,7 @@ import { ExerciseGoalsPage, ExerciseWeeklyPage, NutritionGoalsPage, NutritionWee
 import { useStartWorkout } from "./screens/startWorkout";
 import { Onboarding } from "./screens/Onboarding";
 import { WorkoutEditor } from "./screens/WorkoutEditor";
+import { WorkoutSummary } from "./screens/WorkoutSummary";
 import { ExerciseProgress } from "./screens/ExerciseProgress";
 import { SettingsPage } from "./screens/Settings";
 import { HabitDetail, HabitEditor } from "./screens/Habits";
@@ -31,12 +33,16 @@ function Shell() {
   const stack = useUi((s) => s.stack);
   const workoutOpen = useUi((s) => s.workoutOpen);
   const toast = useUi((s) => s.toast);
+  const toastAction = useUi((s) => s.toastAction);
   const active = useApp((s) => s.active);
   // First launch: nothing set up and nothing logged yet. People who already use the app can
   // open the same setup from Menu → Settings → Set up my plan again.
   const firstRunNow = useApp((s) => !s.onboarded && s.foodLog.length === 0 && s.workouts.length === 0);
   // Decided once at launch, so setup stays open through its "Done" screen after the plan is saved.
   const [firstRun, setFirstRun] = useState(firstRunNow);
+
+  // Shell only mounts once stored data has loaded, so reminders plan from real state.
+  useEffect(() => startReminders(), []);
 
   // Android/browser back button closes the top page instead of leaving the app.
   useEffect(() => {
@@ -88,7 +94,20 @@ function Shell() {
 
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+var(--sa-bottom))] z-[90] flex justify-center">
-          <div className="rounded-full bg-surf3 px-4 py-2 text-sm font-medium shadow-lg animate-fade-in">{toast}</div>
+          <div className="flex items-center gap-3 rounded-full bg-surf3 py-2 pl-4 pr-2 text-sm font-medium shadow-lg animate-fade-in">
+            <span className="pr-2">{toast}</span>
+            {toastAction && (
+              <button
+                className="pointer-events-auto rounded-full px-3 py-1 font-semibold text-acc active:bg-surf2"
+                onClick={() => {
+                  toastAction.run();
+                  useUi.setState({ toast: null, toastAction: null });
+                }}
+              >
+                {toastAction.label}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -105,6 +124,8 @@ function PageView({ page }: { page: Page }) {
       return <RoutineEditor routineId={page.routineId} />;
     case "workoutDetail":
       return <WorkoutDetail workoutId={page.workoutId} />;
+    case "workoutSummary":
+      return <WorkoutSummary workoutId={page.workoutId} />;
     case "workoutEditor":
       return <WorkoutEditor workoutId={page.workoutId} />;
     case "exerciseProgress":

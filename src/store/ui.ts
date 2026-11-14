@@ -9,6 +9,7 @@ export type Page =
   | { kind: "foodEditor"; foodId?: string; name?: string }
   | { kind: "routineEditor"; routineId?: string }
   | { kind: "workoutDetail"; workoutId: string }
+  | { kind: "workoutSummary"; workoutId: string }
   | { kind: "workoutEditor"; workoutId: string }
   | { kind: "exerciseProgress"; exerciseId: string }
   | { kind: "nutritionGoals" }
@@ -28,13 +29,15 @@ interface UiState {
   addOpen: boolean;
   workoutOpen: boolean;
   toast: string | null;
+  /** Optional button on the toast, e.g. Undo */
+  toastAction: { label: string; run: () => void } | null;
   setTab: (t: Tab) => void;
   push: (p: Page) => void;
   pop: () => void;
   setMenu: (open: boolean) => void;
   setAdd: (open: boolean) => void;
   setWorkoutOpen: (open: boolean) => void;
-  showToast: (msg: string) => void;
+  showToast: (msg: string, action?: { label: string; run: () => void }) => void;
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -46,15 +49,17 @@ export const useUi = create<UiState>((set) => ({
   addOpen: false,
   workoutOpen: false,
   toast: null,
+  toastAction: null,
   setTab: (tab) => set({ tab, stack: [] }),
   push: (p) => set((s) => ({ stack: [...s.stack, p], menuOpen: false, addOpen: false })),
   pop: () => set((s) => ({ stack: s.stack.slice(0, -1) })),
   setMenu: (menuOpen) => set({ menuOpen }),
   setAdd: (addOpen) => set({ addOpen }),
   setWorkoutOpen: (workoutOpen) => set({ workoutOpen }),
-  showToast: (toast) => {
+  showToast: (toast, action) => {
     clearTimeout(toastTimer);
-    set({ toast });
-    toastTimer = setTimeout(() => set({ toast: null }), 2200);
+    set({ toast, toastAction: action ?? null });
+    // a toast with Undo stays long enough to reach for it
+    toastTimer = setTimeout(() => set({ toast: null, toastAction: null }), action ? 5000 : 2200);
   },
 }));

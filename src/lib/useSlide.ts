@@ -70,6 +70,11 @@ export function useSlide() {
     onPointerMove: (e: PointerEvent) => {
       const d = drag.current;
       if (!d || d.id !== e.pointerId) return;
+      // a mouse moving with no button held isn't a drag (the release happened elsewhere)
+      if (e.pointerType === "mouse" && e.buttons === 0) {
+        drag.current = null;
+        return;
+      }
       const dx = e.clientX - d.x0;
       const dy = e.clientY - d.y0;
       if (d.mode === "?") {

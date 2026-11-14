@@ -23,6 +23,8 @@ export const DATA_KEYS = [
   "habits",
   "habitLog",
   "exerciseNotes",
+  "savedMeals",
+  "reminders",
 ] as const;
 
 export interface BackupFile {

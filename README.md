@@ -47,6 +47,9 @@ Re-run any time from Settings → Set up my plan again.
 - Meals (Breakfast / Lunch / Dinner / Snacks + your own). Each meal shows its own card: calories as % of
   the day, each macro's share of the meal, and honest feedback on that meal alone (size vs. a typical
   meal, macro balance, protein). Other meals never change it.
+- Empty meal today but you ate it yesterday? A "Same as yesterday" chip copies it in one tap. The meal's
+  ··· menu also has "Copy yesterday's …" and "Save as a meal".
+- Swipe a food left to delete it; Undo on the toast brings it back.
 - Exercise: the day's workouts; body weight; a "Getting started" checklist for new users
 
 **Habits (on Today, under Calories)**
@@ -62,7 +65,10 @@ Re-run any time from Settings → Set up my plan again.
 **Bottom bar:** Previous workouts · Workout routines · **Today** (pill) · My Foods · **+** (Workout, Food or Habit)
 
 **Menu**
-- Settings (kg/lb, backup export/restore, set up my plan again)
+- Settings (kg/lb, reminders, backup export/restore, set up my plan again)
+- Reminders (Android notifications, all off by default): breakfast, lunch and dinner at your times —
+  skipped if that meal is already logged — and one for habits, only if some are still open that day.
+  Tapping a meal reminder opens Log food for that meal.
 - Nutrition: Daily goals (calories & macros that always add up, over-goal allowance, optional
   lose/maintain/gain helper)
   · Weekly summary · Weight tracker
@@ -77,7 +83,10 @@ Re-run any time from Settings → Set up my plan again.
 - Exercise notes: a note under each exercise's name (grip, seat height, a cue) that stays with the
   exercise and shows every time you do it; also on the exercise's ⓘ page.
 - + Add set, + Add exercise (65 preloaded exercises + your own), replace/reorder/remove,
-  Settings, Discard workout, Finish (calorie estimate you can edit).
+  Settings, Discard workout, Finish (calorie estimate you can edit). Swipe a set left to delete it (Undo).
+- The screen stays on while a workout is open.
+- Finishing shows a summary: PRs, duration/volume vs. your last session of this routine, and per exercise
+  today's best set against last time ("+2.5 kg", "+1 rep", "First time"). Share sends it as text.
 - New personal records (heaviest weight, best est. 1RM, best set volume, most reps for body-weight moves)
   trigger a golden trophy and a chime. PRs only count against earlier workouts: the first time you do an
   exercise there's nothing to beat, so no trophy even if set 2 beats set 1.
@@ -97,4 +106,6 @@ Re-run any time from Settings → Set up my plan again.
   to a food only when every word fits (Hindi names like chapati/dahi/anda and small typos work);
   otherwise you get "Create <food>" plus "Did you mean…" suggestions.
 - Amounts in servings or grams (switch per item; the amount converts).
+- Quick add: just calories (and macros if you know them) for when you can't look a food up.
+- Saved meals show as chips above the text box: one tap logs the whole meal (long-press to delete).
 - ~120 preloaded foods (Indian staples, proteins, dairy, grains, fruit, veg, snacks, drinks); create/edit your own in My Foods.

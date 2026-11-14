@@ -166,3 +166,22 @@ export interface Habit {
 
 /** date (YYYY-MM-DD) → habit id → count done that day */
 export type HabitLog = Record<string, Record<string, number>>;
+
+// ---------- Saved meals & reminders ----------
+
+/** One food inside a saved meal — the same snapshot a diary entry keeps. */
+export type SavedMealItem = Omit<FoodLogEntry, "id" | "date" | "meal" | "createdAt">;
+
+export interface SavedMeal {
+  id: string;
+  name: string;
+  items: SavedMealItem[];
+  createdAt: number;
+}
+
+export interface Reminders {
+  /** Nudge to log a meal if nothing is logged in it by this time ("HH:MM"). */
+  meals: Record<"breakfast" | "lunch" | "dinner", { on: boolean; time: string }>;
+  /** Evening nudge when habits due today are still unticked. */
+  habits: { on: boolean; time: string };
+}

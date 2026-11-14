@@ -11,6 +11,7 @@ const config: CapacitorConfig = {
   plugins: {
     // Light status-bar icons on our dark background; safe-area sizes are passed to CSS.
     SystemBars: { style: "DARK", insetsHandling: "css" },
+    LocalNotifications: { smallIcon: "ic_stat_pulse", iconColor: "#3987e5" },
   },
 };
 

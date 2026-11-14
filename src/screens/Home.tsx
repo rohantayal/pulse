@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronRight, Dumbbell, Menu, MoreHorizontal, Pencil, Plus, Scale, Share2, Trash2 } from "lucide-react";
+import { Bookmark, CalendarDays, ChevronRight, Dumbbell, Menu, MoreHorizontal, Pencil, Plus, RotateCcw, Scale, Share2, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { isCustomMeal, useApp, useUnit } from "../store/app";
 import { fromUnit } from "../lib/units";
 import { useUi } from "../store/ui";
-import type { FoodLogEntry, MealDef, NutritionGoals } from "../types";
+import type { FoodLogEntry, MealDef, NutritionGoals, SavedMealItem } from "../types";
+import { SwipeRow } from "../components/SwipeRow";
 import { addDays, dayNum, dowShort, friendlyDate, longDate, todayKey, weekDays, formatDuration } from "../lib/date";
 import { useSlide } from "../lib/useSlide";
 import { dayStats } from "../lib/day";
@@ -160,6 +161,8 @@ export function Home() {
             key={m.id}
             meal={m}
             entries={dayEntries.filter((e) => e.meal === m.id)}
+            yesterday={foodLog.filter((e) => e.date === addDays(date, -1) && e.meal === m.id)}
+            date={date}
             goals={goals}
             onAdd={() => push({ kind: "logFood", meal: m.id, date })}
             onEdit={setEditEntry}
@@ -230,7 +233,15 @@ export function Home() {
       </Sheet>
 
       <AddMealSheet open={addingMeal} onClose={() => setAddingMeal(false)} />
-      {mealMenu && <MealMenuSheet meal={mealMenu} onClose={() => setMealMenu(null)} />}
+      {mealMenu && (
+        <MealMenuSheet
+          meal={mealMenu}
+          date={date}
+          entries={dayEntries.filter((e) => e.meal === mealMenu.id)}
+          yesterday={foodLog.filter((e) => e.date === addDays(date, -1) && e.meal === mealMenu.id)}
+          onClose={() => setMealMenu(null)}
+        />
+      )}
       {editEntry && <FoodEntrySheet entry={editEntry} onClose={() => setEditEntry(null)} />}
       <QuickNumberSheet
         open={weightOpen}
@@ -294,9 +305,31 @@ function Macro({ label, now, goal }: { label: string; now: number; goal: number 
   );
 }
 
+/** The food part of a diary entry, for copying it into another day or a saved meal. */
+export function itemOf(e: FoodLogEntry): SavedMealItem {
+  const { id: _id, date: _d, meal: _m, createdAt: _c, ...item } = e;
+  void _id;
+  void _d;
+  void _m;
+  void _c;
+  return item;
+}
+
+/** Log a set of foods into a meal, with Undo. */
+function copyInto(date: string, meal: MealDef, items: SavedMealItem[], what: string) {
+  const st = useApp.getState();
+  const ids = st.logItems(date, meal.id, items);
+  useUi.getState().showToast(`${what} added to ${meal.label}`, {
+    label: "Undo",
+    run: () => ids.forEach((id) => useApp.getState().removeFoodEntry(id)),
+  });
+}
+
 function MealBlock({
   meal,
   entries,
+  yesterday,
+  date,
   onAdd,
   onEdit,
   onMenu,
@@ -304,6 +337,9 @@ function MealBlock({
 }: {
   meal: MealDef;
   entries: FoodLogEntry[];
+  /** the same meal yesterday — offered as one tap when today's is empty */
+  yesterday: FoodLogEntry[];
+  date: string;
   goals: NutritionGoals;
   onAdd: () => void;
   onEdit: (e: FoodLogEntry) => void;
@@ -328,15 +364,24 @@ function MealBlock({
         {entries.map((e) => {
           const m = entryMacros(e);
           return (
-            <button key={e.id} onClick={() => onEdit(e)} className="flex w-full items-center gap-3 border-b border-line px-4 py-3 text-left active:bg-surf2">
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{e.name}</div>
-                <div className="truncate text-xs text-tx2">
-                  {amountLabel(e)} · C {fmt(m.carbs)} · P {fmt(m.protein)} · F {fmt(m.fat)}
+            <SwipeRow
+              key={e.id}
+              className="border-b border-line"
+              onDelete={() => {
+                useApp.getState().removeFoodEntry(e.id);
+                useUi.getState().showToast(`Removed ${e.name}`, { label: "Undo", run: () => useApp.getState().restoreFoodEntries([e]) });
+              }}
+            >
+              <button onClick={() => onEdit(e)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-surf2">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{e.name}</div>
+                  <div className="truncate text-xs text-tx2">
+                    {amountLabel(e)} · C {fmt(m.carbs)} · P {fmt(m.protein)} · F {fmt(m.fat)}
+                  </div>
                 </div>
-              </div>
-              <div className="text-sm font-semibold tabular-nums">{fmt(m.calories)}</div>
-            </button>
+                <div className="text-sm font-semibold tabular-nums">{fmt(m.calories)}</div>
+              </button>
+            </SwipeRow>
           );
         })}
         {entries.length > 0 && (
@@ -348,20 +393,77 @@ function MealBlock({
             className="border-b border-line px-4 py-4"
           />
         )}
-        <button onClick={onAdd} className="flex w-full items-center gap-2 px-4 py-3 text-sm font-semibold text-acc active:bg-surf2">
+        <div className="flex items-center">
+          <button onClick={onAdd} className="flex flex-1 items-center gap-2 px-4 py-3 text-sm font-semibold text-acc active:bg-surf2">
           <Plus size={16} /> Add food
         </button>
+          {entries.length === 0 && yesterday.length > 0 && (
+            <button
+              onClick={() => copyInto(date, meal, yesterday.map(itemOf), "Yesterday's " + meal.label.toLowerCase())}
+              className="mr-3 flex shrink-0 items-center gap-1.5 rounded-full bg-surf2 px-3 py-1.5 text-xs font-semibold text-tx2 active:bg-surf3"
+            >
+              <RotateCcw size={13} /> Same as yesterday · {fmt(sumEntries(yesterday).calories)} kcal
+            </button>
+          )}
+        </div>
       </Card>
     </div>
   );
 }
 
-function MealMenuSheet({ meal, onClose }: { meal: MealDef; onClose: () => void }) {
+function MealMenuSheet({
+  meal,
+  date,
+  entries,
+  yesterday,
+  onClose,
+}: {
+  meal: MealDef;
+  date: string;
+  entries: FoodLogEntry[];
+  yesterday: FoodLogEntry[];
+  onClose: () => void;
+}) {
   const [name, setName] = useState(meal.label);
   const [confirm, setConfirm] = useState(false);
+  const [saveName, setSaveName] = useState<string | null>(null);
   const custom = isCustomMeal(meal.id);
   return (
     <Sheet open onClose={onClose} title={meal.label}>
+      <div className="mb-4 space-y-2">
+        {yesterday.length > 0 && (
+          <Button
+            variant="secondary"
+            className="w-full justify-start"
+            onClick={() => {
+              copyInto(date, meal, yesterday.map(itemOf), "Yesterday's " + meal.label.toLowerCase());
+              onClose();
+            }}
+          >
+            <RotateCcw size={16} /> Copy yesterday's {meal.label.toLowerCase()} · {fmt(sumEntries(yesterday).calories)} kcal
+          </Button>
+        )}
+        {entries.length > 0 &&
+          (saveName == null ? (
+            <Button variant="secondary" className="w-full justify-start" onClick={() => setSaveName(`My ${meal.label.toLowerCase()}`)}>
+              <Bookmark size={16} /> Save as a meal
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              <input className={inputCls} autoFocus value={saveName} onChange={(e) => setSaveName(e.target.value)} aria-label="Saved meal name" />
+              <Button
+                disabled={!saveName.trim()}
+                onClick={() => {
+                  useApp.getState().saveMeal(saveName, entries.map(itemOf));
+                  useUi.getState().showToast(`Saved “${saveName.trim()}” — find it when you log food`);
+                  onClose();
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          ))}
+      </div>
       <div className="flex gap-2">
         <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} aria-label="Meal name" />
         <Button

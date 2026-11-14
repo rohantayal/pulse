@@ -1,11 +1,14 @@
 import { useRef, useState } from "react";
-import { Download, Scale, Upload, UserRound } from "lucide-react";
+import { Bell, Download, Scale, Upload, UserRound } from "lucide-react";
 import clsx from "clsx";
 import { useApp } from "../store/app";
 import { useUi } from "../store/ui";
 import { isNative } from "../lib/platform";
 import { describeBackup, makeBackup, parseBackup, saveBackupFile, type BackupFile } from "../lib/backup";
 import { Button, Card, Confirm, PageHeader, Screen, SectionTitle } from "../components/ui";
+import { Toggle } from "./ActiveWorkout";
+import { reminderPermission, syncReminders } from "../lib/reminders";
+import type { Reminders } from "../types";
 
 function ago(ts?: number) {
   if (!ts) return "never";
@@ -58,6 +61,8 @@ export function SettingsPage() {
             ))}
           </div>
         </Card>
+
+        <RemindersSection />
 
         <SectionTitle>Backup</SectionTitle>
         <Card>
@@ -113,4 +118,70 @@ export function SettingsPage() {
       />
     </Screen>
   );
+}
+
+/** Gentle nudges to log meals and check habits. Skipped automatically once you've done it. */
+function RemindersSection() {
+  const reminders = useApp((s) => s.reminders);
+  const showToast = useUi((s) => s.showToast);
+
+  async function update(next: Reminders, turningOn: boolean) {
+    if (turningOn) {
+      if (!isNative) {
+        showToast("Reminders work in the Android app");
+        return;
+      }
+      if (!(await reminderPermission())) {
+        showToast("Allow notifications for Pulse in Android settings");
+        return;
+      }
+    }
+    useApp.getState().setReminders(next);
+    void syncReminders();
+  }
+
+  const rows: { key: "breakfast" | "lunch" | "dinner" | "habits"; label: string; hint: string }[] = [
+    { key: "breakfast", label: "Breakfast", hint: "Skipped if you've already logged it" },
+    { key: "lunch", label: "Lunch", hint: "Skipped if you've already logged it" },
+    { key: "dinner", label: "Dinner", hint: "Skipped if you've already logged it" },
+    { key: "habits", label: "Habits", hint: "Only if some are still open that day" },
+  ];
+  const get = (k: (typeof rows)[number]["key"]) => (k === "habits" ? reminders.habits : reminders.meals[k]);
+  const put = (k: (typeof rows)[number]["key"], v: { on: boolean; time: string }): Reminders =>
+    k === "habits" ? { ...reminders, habits: v } : { ...reminders, meals: { ...reminders.meals, [k]: v } };
+
+  return (
+    <>
+      <SectionTitle>Reminders</SectionTitle>
+      <Card className="divide-y divide-line p-0">
+        {rows.map((r) => {
+          const v = get(r.key);
+          return (
+            <div key={r.key} className="flex items-center gap-3 px-4 py-3">
+              <Bell size={18} className={clsx("shrink-0", v.on ? "text-acc" : "text-tx3")} />
+              {/* readable label; the real time input sits invisibly on top and opens the native picker */}
+              <label className="relative shrink-0 rounded-lg bg-surf2 px-2.5 py-1.5 text-sm font-medium tabular-nums">
+                {clock(v.time)}
+                <input
+                  type="time"
+                  value={v.time}
+                  onChange={(e) => e.target.value && void update(put(r.key, { ...v, time: e.target.value }), false)}
+                  className="absolute inset-0 h-full w-full opacity-0"
+                  aria-label={`${r.label} reminder time`}
+                />
+              </label>
+              <div className="min-w-0 flex-1">
+                <Toggle label={r.label} hint={r.hint} on={v.on} onChange={(on) => void update(put(r.key, { ...v, on }), on)} />
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+    </>
+  );
+}
+
+function clock(time: string) {
+  const [h, m] = time.split(":").map(Number);
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }

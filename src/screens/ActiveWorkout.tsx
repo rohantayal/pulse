@@ -10,10 +10,12 @@ import { fmt } from "../lib/format";
 import { latestWeight } from "../lib/nutrition";
 import { PR_LABEL, bestSetsByPosition, completedSets, estimateWorkoutCalories, exercisesVolume, formatSet, lastSetsInRoutine } from "../lib/workout";
 import { playPrChime } from "../lib/sound";
+import { allowSleep, stayAwake } from "../lib/keepAwake";
 import { Button, Confirm, Field, NumberInput, Sheet, inputCls } from "../components/ui";
 import { ExercisePicker } from "./ExercisePicker";
 import { ExerciseProgress } from "./ExerciseProgress";
 import { ExerciseThumb } from "../components/ExerciseThumb";
+import { SwipeRow } from "../components/SwipeRow";
 import { InfoButton } from "../components/InfoButton";
 import { primaryLabel } from "../lib/muscles";
 
@@ -53,6 +55,18 @@ export function ActiveWorkout() {
   const [infoFor, setInfoFor] = useState<string | null>(null);
 
   const byId = useMemo(() => new Map(allExercises(custom).map((e) => [e.id, e])), [custom]);
+
+  // Keep the screen on while the workout is open (browsers drop the lock when the tab is hidden,
+  // so take it again when you come back).
+  useEffect(() => {
+    void stayAwake();
+    const again = () => document.visibilityState === "visible" && void stayAwake();
+    document.addEventListener("visibilitychange", again);
+    return () => {
+      document.removeEventListener("visibilitychange", again);
+      void allowSleep();
+    };
+  }, []);
 
   useEffect(() => {
     if (!flash) return;
@@ -320,47 +334,56 @@ function ExerciseBlock({
           const prev = last[i];
           const pr = s.done && s.pr && s.pr.length > 0;
           return (
-            <div
+            <SwipeRow
               key={s.id}
-              className={clsx(
-                "grid grid-cols-[2.25rem_1fr_4.5rem_4rem_2.5rem] items-center gap-2 rounded-lg px-1 py-1 transition-colors",
-                s.done && (pr ? "bg-gold/15" : "bg-good/15"),
-              )}
+              bg="bg-bg"
+              className="rounded-lg"
+              onDelete={() => {
+                store.removeSet(we.id, s.id);
+                useUi.getState().showToast(`Set ${i + 1} removed`, { label: "Undo", run: () => useApp.getState().restoreSet(we.id, s, i) });
+              }}
             >
-              <button onClick={() => onSetMenu(s, i + 1)} className="flex h-8 items-center justify-center rounded-md text-sm font-semibold active:bg-surf3">
-                {pr ? <Trophy size={16} className="text-gold" fill="#f5c542" /> : i + 1}
-              </button>
-              <button
-                onClick={() => top && store.updateSet(we.id, s.id, { kg: top.kg, reps: top.reps })}
-                className="truncate text-left text-sm text-tx2"
-                title="Your best for this set — tap to copy"
-              >
-                {top ? formatSet(top, unit) : "–"}
-              </button>
-              <SetInput
-                value={s.kg == null ? null : toUnit(s.kg, unit)}
-                placeholder={prev?.kg != null ? String(+toUnit(prev.kg, unit).toFixed(1)) : "0"}
-                onChange={(v) => store.updateSet(we.id, s.id, { kg: v == null ? null : fromUnit(v, unit) })}
-                done={s.done}
-              />
-              <SetInput
-                value={s.reps}
-                placeholder={prev?.reps != null ? String(prev.reps) : "0"}
-                onChange={(v) => store.updateSet(we.id, s.id, { reps: v == null ? null : Math.round(v) })}
-                done={s.done}
-                integer
-              />
-              <button
-                onClick={() => onTick(we, s, prev)}
-                aria-label={s.done ? "Mark set not done" : "Complete set"}
+              <div
                 className={clsx(
-                  "mx-auto flex h-8 w-8 items-center justify-center rounded-md transition",
-                  s.done ? (pr ? "bg-gold text-black" : "bg-good text-white") : "bg-surf3 text-tx2",
+                  "grid grid-cols-[2.25rem_1fr_4.5rem_4rem_2.5rem] items-center gap-2 rounded-lg px-1 py-1 transition-colors",
+                  s.done && (pr ? "bg-gold/15" : "bg-good/15"),
                 )}
               >
-                <Check size={18} strokeWidth={3} />
-              </button>
-            </div>
+                <button onClick={() => onSetMenu(s, i + 1)} className="flex h-8 items-center justify-center rounded-md text-sm font-semibold active:bg-surf3">
+                  {pr ? <Trophy size={16} className="text-gold" fill="#f5c542" /> : i + 1}
+                </button>
+                <button
+                  onClick={() => top && store.updateSet(we.id, s.id, { kg: top.kg, reps: top.reps })}
+                  className="truncate text-left text-sm text-tx2"
+                  title="Your best for this set — tap to copy"
+                >
+                  {top ? formatSet(top, unit) : "–"}
+                </button>
+                <SetInput
+                  value={s.kg == null ? null : toUnit(s.kg, unit)}
+                  placeholder={prev?.kg != null ? String(+toUnit(prev.kg, unit).toFixed(1)) : "0"}
+                  onChange={(v) => store.updateSet(we.id, s.id, { kg: v == null ? null : fromUnit(v, unit) })}
+                  done={s.done}
+                />
+                <SetInput
+                  value={s.reps}
+                  placeholder={prev?.reps != null ? String(prev.reps) : "0"}
+                  onChange={(v) => store.updateSet(we.id, s.id, { reps: v == null ? null : Math.round(v) })}
+                  done={s.done}
+                  integer
+                />
+                <button
+                  onClick={() => onTick(we, s, prev)}
+                  aria-label={s.done ? "Mark set not done" : "Complete set"}
+                  className={clsx(
+                    "mx-auto flex h-8 w-8 items-center justify-center rounded-md transition",
+                    s.done ? (pr ? "bg-gold text-black" : "bg-good text-white") : "bg-surf3 text-tx2",
+                  )}
+                >
+                  <Check size={18} strokeWidth={3} />
+                </button>
+              </div>
+            </SwipeRow>
           );
         })}
       </div>
@@ -477,7 +500,7 @@ export function Toggle({ label, hint, on, onChange }: { label: string; hint?: st
 function FinishSheet({ onClose }: { onClose: () => void }) {
   const active = useApp((s) => s.active)!;
   const weights = useApp((s) => s.weights);
-  const { setWorkoutOpen, showToast, push } = useUi();
+  const { setWorkoutOpen, push } = useUi();
   const duration = Date.now() - active.startedAt;
   const [name, setName] = useState(active.name);
   const [kcal, setKcal] = useState<number | null>(() => estimateWorkoutCalories(duration, latestWeight(weights, active.date) ?? 70));
@@ -514,8 +537,7 @@ function FinishSheet({ onClose }: { onClose: () => void }) {
               const w = useApp.getState().finishWorkout({ name, caloriesBurned: kcal ?? 0, notes });
               if (!w) return;
               setWorkoutOpen(false);
-              showToast("Workout saved 💪");
-              push({ kind: "workoutDetail", workoutId: w.id });
+              push({ kind: "workoutSummary", workoutId: w.id });
             }}
           >
             Save workout

@@ -9,6 +9,9 @@ import type {
   FoodLogEntry,
   Habit,
   HabitLog,
+  Reminders,
+  SavedMeal,
+  SavedMealItem,
   Meal,
   MealDef,
   NutritionGoals,
@@ -38,6 +41,20 @@ export interface AppState {
   profile: Profile | null;
   habits: Habit[];
   habitLog: HabitLog;
+  savedMeals: SavedMeal[];
+  saveMeal: (name: string, items: SavedMealItem[]) => SavedMeal;
+  deleteSavedMeal: (id: string) => void;
+  /** Log several foods at once (a saved meal, or yesterday's meal). Returns the new entry ids. */
+  logItems: (date: string, meal: Meal, items: SavedMealItem[]) => string[];
+  /** Log calories (and optionally macros) without picking a food. */
+  quickAdd: (date: string, meal: Meal, q: { name?: string; calories: number; carbs?: number; protein?: number; fat?: number }) => void;
+  /** Put back entries that were just deleted (Undo). */
+  restoreFoodEntries: (entries: FoodLogEntry[]) => void;
+  /** Put a deleted set back where it was (Undo). */
+  restoreSet: (weId: string, set: WorkoutSet, index: number) => void;
+  reminders: Reminders;
+  setReminders: (r: Reminders) => void;
+
   /** Notes per exercise (by exercise id), shown under its name in every workout */
   exerciseNotes: Record<string, string>;
   setExerciseNote: (exerciseId: string, note: string) => void;
@@ -189,6 +206,52 @@ export const useApp = create<AppState>()(
       habits: [],
       habitLog: {},
       exerciseNotes: {},
+      savedMeals: [],
+      saveMeal: (name, items) => {
+        const m: SavedMeal = { id: uid(), name: name.trim(), items, createdAt: Date.now() };
+        set((s) => ({ savedMeals: [m, ...s.savedMeals] }));
+        return m;
+      },
+      deleteSavedMeal: (id) => set((s) => ({ savedMeals: s.savedMeals.filter((m) => m.id !== id) })),
+      logItems: (date, meal, items) => {
+        const now = Date.now();
+        const entries: FoodLogEntry[] = items.map((it, i) => ({ ...it, id: uid(), date, meal, createdAt: now + i }));
+        set((s) => ({ foodLog: [...s.foodLog, ...entries] }));
+        return entries.map((e) => e.id);
+      },
+      quickAdd: (date, meal, q) =>
+        set((s) => ({
+          foodLog: [
+            ...s.foodLog,
+            {
+              id: uid(),
+              date,
+              meal,
+              foodId: "quick",
+              name: q.name?.trim() || "Quick add",
+              serving: "quick add",
+              servings: 1,
+              per: { calories: q.calories, carbs: q.carbs ?? 0, protein: q.protein ?? 0, fat: q.fat ?? 0 },
+              createdAt: Date.now(),
+            },
+          ],
+        })),
+      restoreFoodEntries: (entries) =>
+        set((s) => {
+          const have = new Set(s.foodLog.map((e) => e.id));
+          return { foodLog: [...s.foodLog, ...entries.filter((e) => !have.has(e.id))] };
+        }),
+      restoreSet: (weId, st, index) =>
+        set((s) =>
+          mapActive(s, (exs) =>
+            mapSets(exs, weId, (sets) => (sets.some((x) => x.id === st.id) ? sets : [...sets.slice(0, index), st, ...sets.slice(index)])),
+          ),
+        ),
+      reminders: {
+        meals: { breakfast: { on: false, time: "10:00" }, lunch: { on: false, time: "14:30" }, dinner: { on: false, time: "21:30" } },
+        habits: { on: false, time: "20:30" },
+      },
+      setReminders: (reminders) => set({ reminders }),
       setExerciseNote: (exerciseId, note) =>
         set((s) => {
           const exerciseNotes = { ...s.exerciseNotes };

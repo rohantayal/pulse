@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ChevronDown, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import { AlertCircle, Bookmark, ChevronDown, Plus, Search, Sparkles, Trash2, X, Zap } from "lucide-react";
 import clsx from "clsx";
 import { allFoods, useApp } from "../store/app";
 import { useUi } from "../store/ui";
-import type { Food, FoodLogEntry, Macros, Meal } from "../types";
+import type { Food, FoodLogEntry, Macros, Meal, SavedMeal } from "../types";
 import { friendlyDate } from "../lib/date";
 import { fmt } from "../lib/format";
 import { ZERO, add, amountLabel, scale, toServings } from "../lib/nutrition";
 import { bestMatch, gramsPerServing, parseFoodText, rankFoods, suggestions, type Unit } from "../lib/foodText";
 import { sumEntries } from "../lib/nutrition";
 import { MealSummary } from "../components/MealSummary";
-import { Button, Field, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
+import { Button, Confirm, Field, NumberInput, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
 import { AddMealSheet } from "../components/AddMealSheet";
 
 /** Per-item choices the user made, keyed by the item's text so they survive edits to other items. */
@@ -50,6 +50,9 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
   const [changing, setChanging] = useState<Item | null>(null);
   const [addingMeal, setAddingMeal] = useState(false);
+  const [quick, setQuick] = useState(false);
+  const [deleting, setDeleting] = useState<SavedMeal | null>(null);
+  const savedMeals = useApp((s) => s.savedMeals);
   const pendingCreate = useRef<{ key: string; known: Set<string> } | null>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
 
@@ -120,6 +123,13 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
     push({ kind: "foodEditor", name: titleCase(item.query) });
   }
 
+  /** A saved meal goes straight into the diary, with Undo. */
+  function logSaved(sm: SavedMeal) {
+    const ids = useApp.getState().logItems(date, meal, sm.items);
+    showToast(`${sm.name} added to ${mealLabel}`, { label: "Undo", run: () => ids.forEach((id) => useApp.getState().removeFoodEntry(id)) });
+    pop();
+  }
+
   function save() {
     if (ready.length === 0) return;
     const st = useApp.getState();
@@ -151,6 +161,28 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
           <button onClick={() => setAddingMeal(true)} className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-line px-3 py-1.5 text-sm font-medium text-tx2">
             <Plus size={14} /> New meal
           </button>
+        </div>
+
+        {/* One-tap: saved meals and quick add */}
+        <div className="no-scrollbar -mx-3 mb-3 flex gap-2 overflow-x-auto px-3">
+          <button onClick={() => setQuick(true)} className="flex shrink-0 items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-sm font-medium text-tx2 active:bg-surf2">
+            <Zap size={14} className="text-gold" /> Quick add
+          </button>
+          {savedMeals.map((sm) => (
+            <button
+              key={sm.id}
+              onClick={() => logSaved(sm)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setDeleting(sm);
+              }}
+              className="flex shrink-0 items-center gap-1.5 rounded-full bg-surf2 px-3 py-1.5 text-sm active:bg-surf3"
+            >
+              <Bookmark size={13} className="text-acc" />
+              {sm.name}
+              <span className="text-xs text-tx3">{fmt(sm.items.reduce((a, it) => a + it.per.calories * it.servings, 0))}</span>
+            </button>
+          ))}
         </div>
 
         {/* What did you eat? */}
@@ -251,6 +283,30 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
           }}
         />
       )}
+      {quick && (
+        <QuickAddSheet
+          mealLabel={mealLabel}
+          onClose={() => setQuick(false)}
+          onAdd={(q) => {
+            useApp.getState().quickAdd(date, meal, q);
+            showToast(`Added ${fmt(q.calories)} kcal to ${mealLabel}`);
+            setQuick(false);
+            pop();
+          }}
+        />
+      )}
+      <Confirm
+        open={!!deleting}
+        title={`Delete “${deleting?.name}”?`}
+        message="Only the saved meal is removed — nothing already in your diary changes."
+        confirmLabel="Delete"
+        destructive
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => {
+          if (deleting) useApp.getState().deleteSavedMeal(deleting.id);
+          setDeleting(null);
+        }}
+      />
       <AddMealSheet open={addingMeal} onClose={() => setAddingMeal(false)} onAdded={(m) => setMeal(m.id)} />
     </Screen>
   );
@@ -567,4 +623,40 @@ function Cell({ label, value, unit }: { label: string; value: number; unit?: str
 
 function titleCase(s: string) {
   return s.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+}
+
+/** Log calories (and optionally macros) without choosing a food — for when you just know the number. */
+function QuickAddSheet({ mealLabel, onClose, onAdd }: { mealLabel: string; onClose: () => void; onAdd: (q: { name?: string; calories: number; carbs?: number; protein?: number; fat?: number }) => void }) {
+  const [calories, setCalories] = useState<number | null>(null);
+  const [name, setName] = useState("");
+  const [carbs, setCarbs] = useState<number | null>(null);
+  const [protein, setProtein] = useState<number | null>(null);
+  const [fat, setFat] = useState<number | null>(null);
+  const valid = calories != null && calories > 0;
+  return (
+    <Sheet open onClose={onClose} title={`Quick add to ${mealLabel}`}>
+      <div className="space-y-3">
+        <Field label="Calories">
+          <NumberInput value={calories} onChange={(v) => setCalories(v == null ? null : Math.max(0, Math.round(v)))} suffix="kcal" step="1" className="text-lg" />
+        </Field>
+        <Field label="What was it? (optional)">
+          <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Office lunch" />
+        </Field>
+        <div className="grid grid-cols-3 gap-2">
+          <Field label="Carbs">
+            <NumberInput value={carbs} onChange={setCarbs} suffix="g" />
+          </Field>
+          <Field label="Protein">
+            <NumberInput value={protein} onChange={setProtein} suffix="g" />
+          </Field>
+          <Field label="Fat">
+            <NumberInput value={fat} onChange={setFat} suffix="g" />
+          </Field>
+        </div>
+        <Button className="w-full" disabled={!valid} onClick={() => valid && onAdd({ name, calories: calories!, carbs: carbs ?? 0, protein: protein ?? 0, fat: fat ?? 0 })}>
+          Add {valid ? `${fmt(calories!)} kcal` : ""}
+        </Button>
+      </div>
+    </Sheet>
+  );
 }
