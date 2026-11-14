@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Check } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import { ROUTINE_TEMPLATES } from "../data/routineTemplates";
 import { PRELOADED_EXERCISES } from "../data/exercises";
 

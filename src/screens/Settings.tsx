@@ -1,12 +1,11 @@
 import { useRef, useState } from "react";
-import { Bell, Download, Scale, Upload, UserRound } from "lucide-react";
-import clsx from "clsx";
+import { Download, Scale, Upload, UserRound } from "lucide-react";
+import { cn as clsx } from "../lib/cn";
 import { useApp } from "../store/app";
 import { useUi } from "../store/ui";
 import { isNative } from "../lib/platform";
 import { describeBackup, makeBackup, parseBackup, saveBackupFile, type BackupFile } from "../lib/backup";
 import { Button, Card, Confirm, PageHeader, Screen, SectionTitle } from "../components/ui";
-import { Toggle } from "./ActiveWorkout";
 import { reminderPermission, syncReminders } from "../lib/reminders";
 import type { Reminders } from "../types";
 
@@ -141,10 +140,10 @@ function RemindersSection() {
   }
 
   const rows: { key: "breakfast" | "lunch" | "dinner" | "habits"; label: string; hint: string }[] = [
-    { key: "breakfast", label: "Breakfast", hint: "Skipped if you've already logged it" },
-    { key: "lunch", label: "Lunch", hint: "Skipped if you've already logged it" },
-    { key: "dinner", label: "Dinner", hint: "Skipped if you've already logged it" },
-    { key: "habits", label: "Habits", hint: "Only if some are still open that day" },
+    { key: "breakfast", label: "Breakfast", hint: "Skipped once logged" },
+    { key: "lunch", label: "Lunch", hint: "Skipped once logged" },
+    { key: "dinner", label: "Dinner", hint: "Skipped once logged" },
+    { key: "habits", label: "Habits", hint: "Only if some are still open" },
   ];
   const get = (k: (typeof rows)[number]["key"]) => (k === "habits" ? reminders.habits : reminders.meals[k]);
   const put = (k: (typeof rows)[number]["key"], v: { on: boolean; time: string }): Reminders =>
@@ -158,9 +157,17 @@ function RemindersSection() {
           const v = get(r.key);
           return (
             <div key={r.key} className="flex items-center gap-3 px-4 py-3">
-              <Bell size={18} className={clsx("shrink-0", v.on ? "text-acc" : "text-tx3")} />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium">{r.label}</div>
+                <div className="truncate text-xs text-tx2">{r.hint}</div>
+              </div>
               {/* readable label; the real time input sits invisibly on top and opens the native picker */}
-              <label className="relative shrink-0 rounded-lg bg-surf2 px-2.5 py-1.5 text-sm font-medium tabular-nums">
+              <label
+                className={clsx(
+                  "relative shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-medium tabular-nums transition",
+                  v.on ? "bg-acc/15 text-acc" : "bg-surf2 text-tx2",
+                )}
+              >
                 {clock(v.time)}
                 <input
                   type="time"
@@ -170,25 +177,33 @@ function RemindersSection() {
                   aria-label={`${r.label} reminder time`}
                 />
               </label>
-              <div className="min-w-0 flex-1">
-                <Toggle label={r.label} hint={r.hint} on={v.on} onChange={(on) => void update(put(r.key, { ...v, on }), on)} />
-              </div>
+              <Switch on={v.on} label={`${r.label} reminder`} onChange={(on) => void update(put(r.key, { ...v, on }), on)} />
             </div>
           );
         })}
         <div className="flex items-center gap-3 px-4 py-3">
-          <Bell size={18} className={clsx("shrink-0", reminders.workout !== false ? "text-acc" : "text-tx3")} />
           <div className="min-w-0 flex-1">
-            <Toggle
-              label="Workout in progress"
-              hint="In the notification bar while you're away from the app mid-workout"
-              on={reminders.workout !== false}
-              onChange={(on) => void update({ ...reminders, workout: on }, on)}
-            />
+            <div className="font-medium">Workout in progress</div>
+            <div className="text-xs text-tx2">Shown while you're away mid-workout</div>
           </div>
+          <Switch on={reminders.workout !== false} label="Workout in progress notification" onChange={(on) => void update({ ...reminders, workout: on }, on)} />
         </div>
       </Card>
     </>
+  );
+}
+
+function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={() => onChange(!on)}
+      className={clsx("relative h-7 w-12 shrink-0 rounded-full transition", on ? "bg-good" : "bg-surf3")}
+    >
+      <span className={clsx("absolute top-0.5 h-6 w-6 rounded-full bg-white transition-all", on ? "left-[22px]" : "left-0.5")} />
+    </button>
   );
 }
 

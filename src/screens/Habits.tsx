@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Pencil, Plus, Trash2, Zap } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import { useApp } from "../store/app";
 import { useUi } from "../store/ui";
 import type { Habit } from "../types";

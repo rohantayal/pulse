@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronLeft, Dumbbell, PieChart, Utensils } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import { useApp } from "../store/app";
 import { buildPlan, macroKcal, type Profile, type Sex } from "../lib/plan";
 import { MacroEditor, macrosMatch, type CaloriesAndMacros } from "../components/MacroEditor";
@@ -78,7 +78,7 @@ export function Onboarding({ onDone, onCancel }: { onDone: (next?: Page) => void
         </div>
 
         {(step === "welcome" || step === "about") && (
-          <div className="pb-safe fixed inset-x-0 bottom-0 mx-auto max-w-md bg-gradient-to-t from-bg via-bg to-transparent px-5 pt-6">
+          <div className="pb-safe fixed inset-x-0 bottom-0 mx-auto max-w-md footer-fade px-5 pt-6">
             <Button className="mb-5 h-12 w-full text-base" onClick={next} disabled={step === "about" && !aboutValid}>
               {step === "welcome" ? "Get started" : "Continue"}
             </Button>
@@ -281,7 +281,7 @@ function PlanStep({ p, onSaved }: { p: Profile; onSaved: () => void }) {
 
       <p className="mt-4 text-xs leading-relaxed text-tx3">Protein and carbs have 4 kcal per gram, fat has 9. A starting point, not a rule — change it any time in Menu → Daily goals.</p>
 
-      <div className="pb-safe fixed inset-x-0 bottom-0 mx-auto max-w-md bg-gradient-to-t from-bg via-bg to-transparent px-5 pt-6">
+      <div className="pb-safe fixed inset-x-0 bottom-0 mx-auto max-w-md footer-fade px-5 pt-6">
         <Button className="mb-5 h-12 w-full text-base" disabled={!valid} onClick={save}>
           Continue
         </Button>
@@ -305,7 +305,7 @@ function RoutineStep({ onNext, onCreateOwn }: { onNext: () => void; onCreateOwn:
       <button onClick={onCreateOwn} className="mt-4 w-full rounded-2xl border border-dashed border-line py-3 text-sm font-semibold text-acc active:bg-surf">
         Create my own instead
       </button>
-      <div className="pb-safe fixed inset-x-0 bottom-0 mx-auto max-w-md bg-gradient-to-t from-bg via-bg to-transparent px-5 pt-6">
+      <div className="pb-safe fixed inset-x-0 bottom-0 mx-auto max-w-md footer-fade px-5 pt-6">
         <Button
           className="mb-5 h-12 w-full text-base"
           variant={picked.length ? "primary" : "secondary"}

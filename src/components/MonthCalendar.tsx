@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import { fromKey, toKey, todayKey } from "../lib/date";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];

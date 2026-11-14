@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Bookmark, ChevronDown, Loader2, Mic, Plus, ScanBarcode, Search, Sparkles, Trash2, X, Zap } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import { allFoods, useApp } from "../store/app";
 import { useUi } from "../store/ui";
 import type { Food, FoodLogEntry, Macros, Meal, SavedMeal } from "../types";
@@ -334,7 +334,7 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
       </div>
 
       {/* Save bar */}
-      <div className="pb-safe fixed inset-x-0 bottom-0 z-[31] mx-auto max-w-md bg-gradient-to-t from-bg via-bg to-transparent px-4 pt-6">
+      <div className="pb-safe fixed inset-x-0 bottom-0 z-[31] mx-auto max-w-md footer-fade px-4 pt-6">
         {unmatched.length > 0 && ready.length > 0 && (
           <div className="mb-2 text-center text-xs text-gold">
             {unmatched.length} item{unmatched.length > 1 ? "s" : ""} not matched — create {unmatched.length > 1 ? "them" : "it"} or {unmatched.length > 1 ? "they" : "it"}'ll be skipped

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Apple, BarChart3, ListChecks, Settings as SettingsIcon, CalendarCheck, ClipboardList, Dumbbell, History, Plus, Scale, Target, Utensils, X } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "./lib/cn";
 import { useApp, useHydrated } from "./store/app";
 import { startReminders } from "./lib/reminders";
 import { useUi, type Page, type Tab } from "./store/ui";

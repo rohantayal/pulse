@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Check, X } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import { useApp } from "../store/app";
 import { useUi } from "../store/ui";
 import { calorieStatus, sumEntries } from "../lib/nutrition";

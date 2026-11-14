@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { Check, Flame, Target, Trophy, Utensils } from "lucide-react";
-import clsx from "clsx";
+import { Beef, Check, Droplet, Flame, Wheat } from "lucide-react";
+import { cn as clsx } from "../lib/cn";
 import { fmt } from "../lib/format";
 import { macroKcal, macrosFor, splitOf, type MacroGrams, type Split } from "../lib/plan";
 import { NumberInput } from "./ui";
@@ -50,16 +50,16 @@ export function MacroEditor({ value, onChange, presets }: { value: CaloriesAndMa
 
   return (
     <div className="space-y-3">
-      <Row icon={<Target size={18} />} label="Calories" hint="kcal / day">
-        <NumberInput value={value.calories} onChange={(v) => changeCalories(v == null ? null : Math.round(v))} step="1" />
+      <Row icon={<Flame size={18} />} label="Calories" hint="per day">
+        <NumberInput value={value.calories} onChange={(v) => changeCalories(v == null ? null : Math.round(v))} suffix="kcal" step="1" />
       </Row>
-      <Row icon={<Trophy size={18} />} label="Protein" hint={`${pct(live.protein)}% of calories`}>
+      <Row icon={<Beef size={18} />} label="Protein" hint={`${pct(live.protein)}% of calories`}>
         <NumberInput value={value.protein} onChange={(v) => changeMacro("protein", v)} suffix="g" step="1" />
       </Row>
-      <Row icon={<Utensils size={18} />} label="Carbs" hint={`${pct(live.carbs)}% of calories`}>
+      <Row icon={<Wheat size={18} />} label="Carbs" hint={`${pct(live.carbs)}% of calories`}>
         <NumberInput value={value.carbs} onChange={(v) => changeMacro("carbs", v)} suffix="g" step="1" />
       </Row>
-      <Row icon={<Flame size={18} />} label="Fat" hint={`${pct(live.fat)}% of calories`}>
+      <Row icon={<Droplet size={18} />} label="Fat" hint={`${pct(live.fat)}% of calories`}>
         <NumberInput value={value.fat} onChange={(v) => changeMacro("fat", v)} suffix="g" step="1" />
       </Row>
       {presets && (

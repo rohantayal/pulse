@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Trophy } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import { allExercises, useApp, useUnit } from "../store/app";
 import { dayNum, longDate, monthShort } from "../lib/date";
 import { fmt } from "../lib/format";

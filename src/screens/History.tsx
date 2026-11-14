@@ -3,7 +3,7 @@ import { ChevronRight, ClipboardList, Clock, Dumbbell, Flame, MoreHorizontal, Pe
 import { allExercises, useApp, useUnit } from "../store/app";
 import { useUi } from "../store/ui";
 import type { Workout } from "../types";
-import { formatDuration, longDate, fromKey } from "../lib/date";
+import { formatDurationShort, longDate, fromKey } from "../lib/date";
 import { fmt } from "../lib/format";
 import { completedSets, exercisesVolume, formatSet, oneRepMax } from "../lib/workout";
 import { Button, Confirm, Empty, PageHeader, Screen, Sheet } from "../components/ui";
@@ -70,7 +70,7 @@ export function HistoryPage() {
                       </div>
                       <div className="mt-3 flex gap-5 text-sm">
                         <span className="flex items-center gap-1.5 text-tx2">
-                          <Clock size={14} /> {formatDuration(w.endedAt - w.startedAt)}
+                          <Clock size={14} /> {formatDurationShort(w.endedAt - w.startedAt)}
                         </span>
                         <span className="text-tx2">
                           {fmt(show(exercisesVolume(w.exercises)))} {unit}
@@ -138,7 +138,7 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
       />
       <div className="px-3 pb-10">
         <div className="grid grid-cols-4 gap-2 rounded-2xl bg-surf p-4 text-center">
-          <DStat icon={<Clock size={14} />} label="Duration" value={formatDuration(w.endedAt - w.startedAt)} />
+          <DStat icon={<Clock size={14} />} label="Duration" value={formatDurationShort(w.endedAt - w.startedAt)} />
           <DStat label="Volume" value={`${fmt(show(exercisesVolume(w.exercises)))} ${unit}`} />
           <DStat label="Sets" value={String(completedSets(w.exercises))} />
           <DStat icon={<Flame size={14} />} label="kcal" value={String(w.caloriesBurned)} />

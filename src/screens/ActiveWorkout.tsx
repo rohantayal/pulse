@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronDown, Flame, MoreHorizontal, NotebookPen, Plus, Repeat, Settings, Trash2, TrendingUp, Trophy, X } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import { allExercises, useApp, useUnit } from "../store/app";
 import { fromUnit, toUnit } from "../lib/units";
 import { useUi } from "../store/ui";

@@ -4,6 +4,7 @@ import { allExercises, useApp } from "../store/app";
 import { useUi } from "../store/ui";
 import type { Routine, RoutineExercise } from "../types";
 import { uid } from "../lib/id";
+import { agoLabel, toKey } from "../lib/date";
 import { Button, Confirm, Field, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
 import { ExercisePicker } from "./ExercisePicker";
 import { TemplatePicker } from "../components/TemplatePicker";
@@ -78,7 +79,7 @@ export function RoutinesPage() {
                       <div className="mt-1 line-clamp-2 text-sm text-tx2">
                         {r.exercises.map((e) => names.get(e.exerciseId) ?? "Unknown").join(", ") || "No exercises"}
                       </div>
-                      {last && <div className="mt-1 text-xs text-tx3">Last done {new Date(last).toLocaleDateString()}</div>}
+                      {last && <div className="mt-1 text-xs text-tx3">Last done {agoLabel(toKey(new Date(last)))}</div>}
                     </div>
                     <button onClick={() => setMenuFor(r)} className="rounded-full p-1.5 text-tx2 active:bg-surf2" aria-label="Routine options">
                       <MoreHorizontal size={20} />
@@ -188,7 +189,7 @@ export function RoutineEditor({ routineId }: { routineId?: string }) {
                   <ExerciseThumb exercise={ex} size={40} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center">
-                      <div className="truncate font-semibold text-acc">{ex?.name ?? "Unknown exercise"}</div>
+                      <div className="line-clamp-2 font-semibold leading-snug text-acc">{ex?.name ?? "Unknown exercise"}</div>
                       {ex && <InfoButton onClick={() => setInfoFor(ex.id)} className="-my-1" />}
                     </div>
                     <div className="truncate text-xs text-tx2">{ex ? `${primaryLabel(ex)} · ${ex.equipment}` : ""}</div>

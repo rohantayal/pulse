@@ -1,10 +1,10 @@
 import { useEffect, useMemo } from "react";
 import { Share2, Trophy } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import { Share } from "@capacitor/share";
 import { allExercises, useApp, useUnit } from "../store/app";
 import { useUi } from "../store/ui";
-import { formatDuration } from "../lib/date";
+import { formatDurationShort } from "../lib/date";
 import { fmt } from "../lib/format";
 import { formatSet } from "../lib/workout";
 import { changeLabel, shareText, workoutSummary } from "../lib/summary";
@@ -27,7 +27,7 @@ export function WorkoutSummary({ workoutId }: { workoutId: string }) {
   }, [w, pop]);
   if (!w || !s) return null;
 
-  const duration = formatDuration(s.durationMs);
+  const duration = formatDurationShort(s.durationMs);
   const improved = s.exercises.filter((c) => c.lastBest && ((c.deltaKg ?? 0) > 0 || ((c.deltaKg ?? 0) === 0 && c.deltaReps > 0))).length;
   const headline = s.prCount
     ? `${s.prCount} new PR${s.prCount > 1 ? "s" : ""}!`
@@ -64,7 +64,12 @@ export function WorkoutSummary({ workoutId }: { workoutId: string }) {
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-2">
-          <Tile label="Duration" value={duration} delta={s.durationDeltaMs == null ? null : `${s.durationDeltaMs >= 0 ? "+" : "−"}${formatDuration(Math.abs(s.durationDeltaMs))}`} neutral />
+          <Tile
+            label="Duration"
+            value={duration}
+            delta={s.durationDeltaMs == null || Math.abs(s.durationDeltaMs) < 60000 ? null : `${s.durationDeltaMs > 0 ? "+" : "−"}${formatDurationShort(Math.abs(s.durationDeltaMs))}`}
+            neutral
+          />
           <Tile
             label="Volume"
             value={`${fmt(show(s.volume))} ${unit}`}
@@ -91,7 +96,7 @@ export function WorkoutSummary({ workoutId }: { workoutId: string }) {
                     <span className="truncate">{ex?.name ?? "Exercise"}</span>
                     {c.prs.length > 0 && <Trophy size={14} className="shrink-0 text-gold" fill="#f5c542" />}
                   </div>
-                  <div className="text-xs text-tx2">
+                  <div className="truncate text-xs text-tx2">
                     Best {formatSet(c.best, unit)}
                     {c.lastBest && <span className="text-tx3"> · last {formatSet(c.lastBest, unit)}</span>}
                   </div>

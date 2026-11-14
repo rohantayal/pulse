@@ -14,6 +14,10 @@ body,
   color: #f2f2f3;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
+  /* Inter's rounder alternates read better at small sizes; smoother rendering on Android */
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 input[type="number"]::-webkit-outer-spin-button,
@@ -42,4 +46,9 @@ input[type="number"] {
 }
 .pt-safe {
   padding-top: var(--sa-top);
+}
+
+/* Bottom action bars: solid behind their content, fading out only in the top 24px (their pt-6). */
+.footer-fade {
+  background: linear-gradient(to top, #0b0b0c calc(100% - 24px), rgba(11, 11, 12, 0));
 }

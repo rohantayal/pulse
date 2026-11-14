@@ -33,7 +33,12 @@ export function SwipeRow({
 
   return (
     <div ref={ref} className={`relative overflow-hidden ${className}`}>
-      <div className="absolute inset-0 flex items-center justify-end bg-bad pr-5 text-sm font-semibold text-white" aria-hidden={x === 0}>
+      {/* hidden at rest: otherwise its edge shows through the row's anti-aliased rounded corners */}
+      <div
+        className="absolute inset-0 flex items-center justify-end bg-bad pr-5 text-sm font-semibold text-white"
+        style={{ visibility: x < 0 ? "visible" : "hidden" }}
+        aria-hidden={x === 0}
+      >
         <Trash2 size={16} className="mr-1.5" /> Delete
       </div>
       <div

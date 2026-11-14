@@ -22,7 +22,7 @@ export default {
         fat: "#d95926",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
+        sans: ["Inter Variable", "Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
       },
       keyframes: {
         "slide-up": { from: { transform: "translateY(100%)" }, to: { transform: "translateY(0)" } },

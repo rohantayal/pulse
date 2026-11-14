@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import { useApp, useUnit } from "../store/app";
 import { fromUnit } from "../lib/units";
 import { buildPlan, goalBlocked, macrosFor, maxPace, splitOf, type GoalType } from "../lib/plan";
 import { MacroEditor, macrosMatch, type CaloriesAndMacros } from "../components/MacroEditor";
 import { useUi } from "../store/ui";
 import type { ExerciseGoals } from "../types";
-import { addDays, dayNum, dowShort, fromKey, longDate, monthShort, todayKey, weekDays, weekStart, formatDuration } from "../lib/date";
+import { addDays, dayNum, dowShort, fromKey, longDate, monthShort, todayKey, weekDays, weekStart, formatDurationShort } from "../lib/date";
 import { fmt } from "../lib/format";
 import { BAR_COLOR, DEFAULT_OVER_ALLOWANCE, GOOD_COLOR, calorieStatus, macroCalories, statusColor } from "../lib/nutrition";
 import { dayStats } from "../lib/day";
@@ -335,16 +335,23 @@ export function WeightPage() {
         <div className="grid grid-cols-3 gap-2">
           <Card className="text-center">
             <div className="text-xs text-tx2">Current</div>
-            <div className="text-lg font-bold tabular-nums">{last ? fmt(show(last.kg), 1) : "–"}</div>
+            <div className="text-lg font-bold tabular-nums">
+              {last ? fmt(show(last.kg), 1) : "–"}
+              {last && <span className="ml-0.5 text-xs font-medium text-tx2">{unit}</span>}
+            </div>
           </Card>
           <Card className="text-center">
             <div className="text-xs text-tx2">Start</div>
-            <div className="text-lg font-bold tabular-nums">{first ? fmt(show(first.kg), 1) : "–"}</div>
+            <div className="text-lg font-bold tabular-nums">
+              {first ? fmt(show(first.kg), 1) : "–"}
+              {first && <span className="ml-0.5 text-xs font-medium text-tx2">{unit}</span>}
+            </div>
           </Card>
           <Card className="text-center">
             <div className="text-xs text-tx2">Change</div>
             <div className={clsx("text-lg font-bold tabular-nums", change < 0 ? "text-good" : change > 0 ? "text-gold" : "")}>
-              {first ? `${change > 0 ? "+" : ""}${fmt(show(change), 1)}` : "–"}
+              {first ? `${change > 0 ? "+" : change < 0 ? "−" : ""}${fmt(Math.abs(show(change)), 1)}` : "–"}
+              {first && <span className="ml-0.5 text-xs font-medium opacity-70">{unit}</span>}
             </div>
           </Card>
         </div>
@@ -499,7 +506,7 @@ export function ExerciseWeeklyPage() {
         <div className="mt-3 grid grid-cols-3 gap-2">
           <Card className="text-center">
             <div className="text-xs text-tx2">Time</div>
-            <div className="text-[15px] font-bold tabular-nums">{totalMs ? formatDuration(totalMs) : "0m"}</div>
+            <div className="text-[15px] font-bold tabular-nums">{totalMs ? formatDurationShort(totalMs) : "0 min"}</div>
           </Card>
           <Card className="text-center">
             <div className="text-xs text-tx2">Volume</div>
@@ -533,7 +540,7 @@ export function ExerciseWeeklyPage() {
                   <div className="text-xs text-tx2">{longDate(w.date)}</div>
                 </div>
                 <div className="text-right text-xs text-tx2">
-                  {formatDuration(w.endedAt - w.startedAt)}
+                  {formatDurationShort(w.endedAt - w.startedAt)}
                   <div>{w.caloriesBurned} kcal</div>
                 </div>
               </div>

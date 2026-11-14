@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import type { Macros, NutritionGoals } from "../types";
 import { fmt } from "../lib/format";
 import { BAR_COLOR, GOOD_COLOR, OVER_COLOR, macroSplit } from "../lib/nutrition";

@@ -65,6 +65,16 @@ export function friendlyDate(key: string, today = todayKey()): string {
   return d.getFullYear() === fromKey(today).getFullYear() ? base : `${base} ${d.getFullYear()}`;
 }
 
+/** "today", "yesterday", "3 days ago", "2 weeks ago", then a date. */
+export function agoLabel(key: string, today = todayKey()): string {
+  const diff = -dayDiff(today, key);
+  if (diff <= 0) return "today";
+  if (diff === 1) return "yesterday";
+  if (diff < 14) return `${diff} days ago`;
+  if (diff < 56) return `${Math.floor(diff / 7)} weeks ago`;
+  return friendlyDate(key, today);
+}
+
 export function longDate(key: string): string {
   const d = fromKey(key);
   return `${DOW[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
@@ -78,6 +88,15 @@ export function formatDuration(ms: number): string {
   if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
   if (m > 0) return `${m}m ${String(s).padStart(2, "0")}s`;
   return `${s}s`;
+}
+
+/** For finished workouts, where seconds are noise: "45 min", "1h 05m", "<1 min". */
+export function formatDurationShort(ms: number): string {
+  const mins = Math.round(Math.max(0, ms) / 60000);
+  if (mins < 1) return "<1 min";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m} min`;
 }
 
 export function formatClock(sec: number): string {

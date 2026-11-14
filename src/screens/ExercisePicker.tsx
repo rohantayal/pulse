@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Check, Plus, Search } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 import { allExercises, useApp } from "../store/app";
 import { EQUIPMENT, MUSCLES } from "../data/exercises";
 import { Button, Field, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
@@ -112,7 +112,7 @@ export function ExercisePicker({
         </div>
       </div>
       {multi && sel.length > 0 && (
-        <div className="pb-safe fixed inset-x-0 bottom-0 z-[46] mx-auto max-w-md bg-gradient-to-t from-bg via-bg to-transparent px-4 pt-6">
+        <div className="pb-safe fixed inset-x-0 bottom-0 z-[46] mx-auto max-w-md footer-fade px-4 pt-6">
           <Button className="mb-4 w-full" onClick={() => onPick(sel)}>
             Add {sel.length} exercise{sel.length > 1 ? "s" : ""}
           </Button>

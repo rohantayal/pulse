@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { ChevronLeft, X } from "lucide-react";
-import clsx from "clsx";
+import { cn as clsx } from "../lib/cn";
 
 export function PageHeader({
   title,
