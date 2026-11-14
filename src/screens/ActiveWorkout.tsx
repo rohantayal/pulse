@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, MoreHorizontal, NotebookPen, Plus, Repeat, Settings, Trash2, TrendingUp, Trophy, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, Flame, MoreHorizontal, NotebookPen, Plus, Repeat, Settings, Trash2, TrendingUp, Trophy, X } from "lucide-react";
 import clsx from "clsx";
 import { allExercises, useApp, useUnit } from "../store/app";
 import { fromUnit, toUnit } from "../lib/units";
@@ -11,6 +11,9 @@ import { latestWeight } from "../lib/nutrition";
 import { PR_LABEL, bestSetsByPosition, completedSets, estimateWorkoutCalories, exercisesVolume, formatSet, lastSetsInRoutine } from "../lib/workout";
 import { playPrChime } from "../lib/sound";
 import { allowSleep, stayAwake } from "../lib/keepAwake";
+import { warmupRamp } from "../lib/plates";
+import { askNotificationsOnce } from "../lib/reminders";
+import { PlateView } from "../components/PlateView";
 import { Button, Confirm, Field, NumberInput, Sheet, inputCls } from "../components/ui";
 import { ExercisePicker } from "./ExercisePicker";
 import { ExerciseProgress } from "./ExerciseProgress";
@@ -46,7 +49,7 @@ export function ActiveWorkout() {
 
   const [picker, setPicker] = useState<null | { mode: "add" } | { mode: "replace"; weId: string }>(null);
   const [menuFor, setMenuFor] = useState<WorkoutExercise | null>(null);
-  const [setMenu, setSetMenu] = useState<{ weId: string; set: WorkoutSet; n: number } | null>(null);
+  const [setMenu, setSetMenu] = useState<{ weId: string; setId: string; label: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [finishing, setFinishing] = useState(false);
@@ -66,6 +69,11 @@ export function ActiveWorkout() {
       document.removeEventListener("visibilitychange", again);
       void allowSleep();
     };
+  }, []);
+
+  // First workout: ask once for notifications, so "Workout in progress" can show when you leave.
+  useEffect(() => {
+    if (useApp.getState().reminders.workout !== false) void askNotificationsOnce();
   }, []);
 
   useEffect(() => {
@@ -141,7 +149,7 @@ export function ActiveWorkout() {
               onTick={tick}
               onMenu={() => setMenuFor(we)}
               onInfo={() => setInfoFor(we.exerciseId)}
-              onSetMenu={(set, n) => setSetMenu({ weId: we.id, set, n })}
+              onSetMenu={(set, label) => setSetMenu({ weId: we.id, setId: set.id, label })}
             />
           ))}
 
@@ -196,6 +204,29 @@ export function ActiveWorkout() {
               variant="secondary"
               className="w-full justify-start"
               onClick={() => {
+                const ex = byId.get(menuFor.exerciseId);
+                const hint = lastSetsInRoutine(workouts, menuFor.exerciseId, active.routineId)[0];
+                const workingKg = menuFor.sets.find((x) => !x.warmup && (x.kg ?? 0) > 0)?.kg ?? hint?.kg ?? null;
+                if (!workingKg) {
+                  showToast("Enter your working weight first");
+                  return;
+                }
+                const ramp = warmupRamp(toUnit(workingKg, unit), unit, ex?.equipment === "Barbell");
+                if (!ramp.length) {
+                  showToast("Too light to need a warm-up");
+                  return;
+                }
+                store.addWarmups(menuFor.id, ramp.map((r) => ({ kg: fromUnit(r.weight, unit), reps: r.reps })));
+                showToast(`Added ${ramp.length} warm-up set${ramp.length > 1 ? "s" : ""}`);
+                setMenuFor(null);
+              }}
+            >
+              <Flame size={16} /> Add warm-up sets
+            </Button>
+            <Button
+              variant="secondary"
+              className="w-full justify-start"
+              onClick={() => {
                 setPicker({ mode: "replace", weId: menuFor.id });
                 setMenuFor(null);
               }}
@@ -224,19 +255,8 @@ export function ActiveWorkout() {
         )}
       </Sheet>
 
-      <Sheet open={!!setMenu} onClose={() => setSetMenu(null)} title={setMenu ? `Set ${setMenu.n}` : ""}>
-        {setMenu && (
-          <Button
-            variant="danger"
-            className="w-full"
-            onClick={() => {
-              store.removeSet(setMenu.weId, setMenu.set.id);
-              setSetMenu(null);
-            }}
-          >
-            <Trash2 size={16} /> Delete set
-          </Button>
-        )}
+      <Sheet open={!!setMenu} onClose={() => setSetMenu(null)} title={setMenu?.label ?? ""}>
+        {setMenu && <SetMenu {...setMenu} exerciseOf={(weId) => byId.get(active.exercises.find((e) => e.id === weId)?.exerciseId ?? "")} onClose={() => setSetMenu(null)} />}
       </Sheet>
 
       <WorkoutSettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -294,7 +314,7 @@ function ExerciseBlock({
   last: WorkoutSet[];
   onTick: (we: WorkoutExercise, s: WorkoutSet, hint?: WorkoutSet) => void;
   onMenu: () => void;
-  onSetMenu: (s: WorkoutSet, n: number) => void;
+  onSetMenu: (s: WorkoutSet, label: string) => void;
   onInfo: () => void;
 }) {
   const store = useApp.getState();
@@ -330,8 +350,10 @@ function ExerciseBlock({
 
       <div className="mt-1 space-y-1">
         {we.sets.map((s, i) => {
-          const top = best[i];
-          const prev = last[i];
+          // warm-ups show "W" and don't take a set number; BEST/hints line up with working sets
+          const n = s.warmup ? -1 : we.sets.slice(0, i).filter((x) => !x.warmup).length;
+          const top = s.warmup ? undefined : best[n];
+          const prev = s.warmup ? undefined : last[n];
           const pr = s.done && s.pr && s.pr.length > 0;
           return (
             <SwipeRow
@@ -340,7 +362,7 @@ function ExerciseBlock({
               className="rounded-lg"
               onDelete={() => {
                 store.removeSet(we.id, s.id);
-                useUi.getState().showToast(`Set ${i + 1} removed`, { label: "Undo", run: () => useApp.getState().restoreSet(we.id, s, i) });
+                useUi.getState().showToast(s.warmup ? "Warm-up set removed" : `Set ${n + 1} removed`, { label: "Undo", run: () => useApp.getState().restoreSet(we.id, s, i) });
               }}
             >
               <div
@@ -349,15 +371,19 @@ function ExerciseBlock({
                   s.done && (pr ? "bg-gold/15" : "bg-good/15"),
                 )}
               >
-                <button onClick={() => onSetMenu(s, i + 1)} className="flex h-8 items-center justify-center rounded-md text-sm font-semibold active:bg-surf3">
-                  {pr ? <Trophy size={16} className="text-gold" fill="#f5c542" /> : i + 1}
+                <button
+                  onClick={() => onSetMenu(s, s.warmup ? "Warm-up set" : `Set ${n + 1}`)}
+                  className={clsx("flex h-8 items-center justify-center rounded-md text-sm font-semibold active:bg-surf3", s.warmup && "text-[#f0a33a]")}
+                  aria-label={s.warmup ? "Warm-up set options" : `Set ${n + 1} options`}
+                >
+                  {pr ? <Trophy size={16} className="text-gold" fill="#f5c542" /> : s.warmup ? "W" : n + 1}
                 </button>
                 <button
                   onClick={() => top && store.updateSet(we.id, s.id, { kg: top.kg, reps: top.reps })}
                   className="truncate text-left text-sm text-tx2"
                   title="Your best for this set — tap to copy"
                 >
-                  {top ? formatSet(top, unit) : "–"}
+                  {s.warmup ? <span className="text-tx3">warm-up</span> : top ? formatSet(top, unit) : "–"}
                 </button>
                 <SetInput
                   value={s.kg == null ? null : toUnit(s.kg, unit)}
@@ -596,5 +622,39 @@ function ExerciseNote({ exerciseId }: { exerciseId: string }) {
       <NotebookPen size={14} className={clsx("mt-0.5 shrink-0", note ? "text-gold" : "")} />
       <span className="whitespace-pre-wrap">{note || "Add a note"}</span>
     </button>
+  );
+}
+
+/** Options for one set: warm-up on/off, the plates to load, delete. */
+function SetMenu({ weId, setId, exerciseOf, onClose }: { weId: string; setId: string; label: string; exerciseOf: (weId: string) => Exercise | undefined; onClose: () => void }) {
+  const set = useApp((s) => s.active?.exercises.find((e) => e.id === weId)?.sets.find((x) => x.id === setId));
+  const unit = useApp((s) => s.unit);
+  const store = useApp.getState();
+  if (!set) return null;
+  const barbell = exerciseOf(weId)?.equipment === "Barbell";
+  return (
+    <div className="space-y-3">
+      {barbell && (set.kg ?? 0) > 0 && <PlateView total={+toUnit(set.kg ?? 0, unit).toFixed(2)} unit={unit} />}
+      <Button
+        variant="secondary"
+        className="w-full justify-start"
+        onClick={() => {
+          store.setWarmup(weId, setId, !set.warmup);
+          onClose();
+        }}
+      >
+        <Flame size={16} className={set.warmup ? "" : "text-[#f0a33a]"} /> {set.warmup ? "Make it a working set" : "Mark as warm-up"}
+      </Button>
+      <Button
+        variant="danger"
+        className="w-full justify-start"
+        onClick={() => {
+          store.removeSet(weId, setId);
+          onClose();
+        }}
+      >
+        <Trash2 size={16} /> Delete set
+      </Button>
+    </div>
   );
 }

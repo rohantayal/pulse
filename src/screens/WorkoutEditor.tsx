@@ -100,7 +100,9 @@ export function WorkoutEditor({ workoutId }: { workoutId: string }) {
             </div>
             {e.sets.map((s, i) => (
               <div key={s.id} className="mt-1 grid grid-cols-[2rem_1fr_1fr_2rem] items-center gap-2 px-1">
-                <div className="text-sm font-semibold text-tx2">{i + 1}</div>
+                <div className={s.warmup ? "text-sm font-semibold text-[#f0a33a]" : "text-sm font-semibold text-tx2"}>
+                  {s.warmup ? "W" : e.sets.slice(0, i).filter((x) => !x.warmup).length + 1}
+                </div>
                 <NumberInput
                   value={s.kg == null ? null : toUnit(s.kg, unit)}
                   onChange={(v) => setEx(e.id, (x) => ({ ...x, sets: x.sets.map((y) => (y.id === s.id ? { ...y, kg: v == null ? null : fromUnit(v, unit) } : y)) }))}

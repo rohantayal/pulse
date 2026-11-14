@@ -83,7 +83,7 @@ export function HistoryPage() {
                         {w.exercises.slice(0, 4).map((e) => (
                           <div key={e.id} className="flex justify-between gap-2 text-sm">
                             <span className="truncate">
-                              {e.sets.length} × {names.get(e.exerciseId) ?? "Unknown"}
+                              {e.sets.filter((s) => !s.warmup).length} × {names.get(e.exerciseId) ?? "Unknown"}
                             </span>
                             <span className="shrink-0 text-tx2">{formatSet(bestSet(e.sets), unit)}</span>
                           </div>
@@ -166,7 +166,15 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
               </div>
               {e.sets.map((s, i) => (
                 <div key={s.id} className="grid grid-cols-[2.5rem_1fr_auto] items-center py-1 text-sm">
-                  <div className="font-semibold text-tx2">{s.pr?.length ? <Trophy size={15} className="text-gold" fill="#f5c542" /> : i + 1}</div>
+                  <div className="font-semibold text-tx2">
+                    {s.pr?.length ? (
+                      <Trophy size={15} className="text-gold" fill="#f5c542" />
+                    ) : s.warmup ? (
+                      <span className="text-[#f0a33a]">W</span>
+                    ) : (
+                      e.sets.slice(0, i).filter((x) => !x.warmup).length + 1
+                    )}
+                  </div>
                   <div className="font-medium">{formatSet(s, unit)}</div>
                   <div className="text-right text-tx2">{s.kg ? `${fmt(show(oneRepMax(s.kg, s.reps ?? 0)), 1)} ${unit}` : "–"}</div>
                 </div>

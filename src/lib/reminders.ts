@@ -84,6 +84,17 @@ export async function reminderPermission(): Promise<boolean> {
   return p.display === "granted";
 }
 
+/** Ask for notification permission only if Android has never asked (no nagging after a "no"). */
+export async function askNotificationsOnce(): Promise<void> {
+  if (!isNative) return;
+  try {
+    const p = await LocalNotifications.checkPermissions();
+    if (p.display === "prompt") await LocalNotifications.requestPermissions();
+  } catch {
+    /* ignore */
+  }
+}
+
 let syncing: Promise<void> | null = null;
 let again = false;
 
@@ -136,21 +147,63 @@ export function syncReminders(): Promise<void> {
   return syncing;
 }
 
+const WORKOUT_ID = 4000;
+
+/** "Workout in progress" while you're away from the app mid-workout; cleared when you're back. */
+async function workoutNotice(show: boolean) {
+  try {
+    if (!show) {
+      await LocalNotifications.cancel({ notifications: [{ id: WORKOUT_ID }] });
+      return;
+    }
+    const s = useApp.getState();
+    const a = s.active;
+    if (!a || s.reminders.workout === false) return;
+    if ((await LocalNotifications.checkPermissions()).display !== "granted") return;
+    const sets = a.exercises.flatMap((e) => e.sets.filter((x) => !x.warmup));
+    const mins = Math.max(1, Math.round((Date.now() - a.startedAt) / 60000));
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: WORKOUT_ID,
+          title: `${a.name} — in progress`,
+          body: `${sets.filter((x) => x.done).length}/${sets.length} sets done · ${mins} min. Tap to get back to it.`,
+          ongoing: true,
+          autoCancel: true,
+          smallIcon: "ic_stat_pulse",
+          extra: { workout: true },
+        },
+      ],
+    });
+  } catch (e) {
+    console.warn("workout notice", e);
+  }
+}
+
 /** Keep reminders in step with the app, and open the right screen when one is tapped. */
 export function startReminders(): () => void {
   if (!isNative) return () => {};
   void syncReminders();
   let timer = 0;
   const unsub = useApp.subscribe((s, prev) => {
+    if (!s.active && prev.active) void workoutNotice(false);
     if (s.reminders === prev.reminders && s.foodLog === prev.foodLog && s.habitLog === prev.habitLog && s.habits === prev.habits && s.workouts === prev.workouts) return;
     window.clearTimeout(timer);
     timer = window.setTimeout(() => void syncReminders(), 800);
   });
-  const onVis = () => document.visibilityState === "visible" && void syncReminders();
+  const onVis = () => {
+    const visible = document.visibilityState === "visible";
+    void workoutNotice(!visible);
+    if (visible) void syncReminders();
+  };
   document.addEventListener("visibilitychange", onVis);
   const listener = LocalNotifications.addListener("localNotificationActionPerformed", (a) => {
-    const extra = a.notification.extra as PlannedReminder["extra"] | undefined;
+    const extra = a.notification.extra as (PlannedReminder["extra"] & { workout?: boolean }) | undefined;
     const ui = useUi.getState();
+    if (extra?.workout) {
+      if (useApp.getState().active) ui.setWorkoutOpen(true);
+      return;
+    }
     useApp.getState().setDate(todayKey());
     ui.setTab("today");
     if (extra?.meal) ui.push({ kind: "logFood", meal: extra.meal, date: todayKey() });

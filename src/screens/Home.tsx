@@ -19,6 +19,7 @@ import { AddMealSheet } from "../components/AddMealSheet";
 import { MealSummary } from "../components/MealSummary";
 import { GettingStarted } from "../components/GettingStarted";
 import { HabitsSection } from "../components/HabitsSection";
+import { CheckinCard } from "../components/CheckinCard";
 
 export function Home() {
   const { unit, show } = useUnit();
@@ -152,6 +153,8 @@ export function Home() {
             <Macro label="Fat" now={stats.food.fat} goal={goals.fat} />
           </div>
         </Card>
+
+        {date === todayKey() && <CheckinCard home />}
 
         <HabitsSection date={date} />
 

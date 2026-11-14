@@ -33,6 +33,8 @@ export interface Food extends Macros {
   grams?: number;
   category?: string;
   custom?: boolean;
+  /** EAN/UPC of a packaged food added by scanning */
+  barcode?: string;
 }
 
 export interface FoodLogEntry {
@@ -89,6 +91,8 @@ export interface WorkoutSet {
   done: boolean;
   /** Set when this set earned a PR at the moment it was completed */
   pr?: PrKind[];
+  /** Warm-up set: logged, but left out of volume, set counts, bests and PRs */
+  warmup?: boolean;
 }
 
 export type PrKind = "weight" | "oneRm" | "volume" | "reps";
@@ -184,4 +188,6 @@ export interface Reminders {
   meals: Record<"breakfast" | "lunch" | "dinner", { on: boolean; time: string }>;
   /** Evening nudge when habits due today are still unticked. */
   habits: { on: boolean; time: string };
+  /** Show "Workout in progress" in the notification bar when you leave the app mid-workout (default on). */
+  workout?: boolean;
 }

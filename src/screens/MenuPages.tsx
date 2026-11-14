@@ -14,6 +14,7 @@ import { dayStats } from "../lib/day";
 import { completedSets, exercisesVolume } from "../lib/workout";
 import { Button, Card, Field, NumberInput, PageHeader, ProgressBar, Screen, SectionTitle, inputCls } from "../components/ui";
 import { BarChart, LineChart } from "../components/Charts";
+import { CheckinCard } from "../components/CheckinCard";
 
 const C = { carbs: BAR_COLOR, protein: BAR_COLOR, fat: BAR_COLOR, cal: GOOD_COLOR, steps: "#3fb96b", burn: BAR_COLOR };
 
@@ -347,6 +348,8 @@ export function WeightPage() {
             </div>
           </Card>
         </div>
+
+        <CheckinCard />
 
         <Card className="mt-3">
           <div className="mb-2 flex items-center justify-between">

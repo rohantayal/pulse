@@ -1,8 +1,9 @@
 import type { PrKind, Workout, WorkoutExercise, WorkoutSet } from "../types";
 import { toUnit, type WeightUnit } from "./units";
 
+/** A finished working set — warm-ups never count towards volume, bests or PRs. */
 export function isCountable(s: WorkoutSet): boolean {
-  return s.done && s.reps != null && s.reps > 0;
+  return s.done && !s.warmup && s.reps != null && s.reps > 0;
 }
 
 export function setVolume(s: WorkoutSet): number {
@@ -14,7 +15,7 @@ export function exercisesVolume(exs: WorkoutExercise[]): number {
 }
 
 export function completedSets(exs: WorkoutExercise[]): number {
-  return exs.reduce((acc, e) => acc + e.sets.filter((s) => s.done).length, 0);
+  return exs.reduce((acc, e) => acc + e.sets.filter((s) => s.done && !s.warmup).length, 0);
 }
 
 /** Epley estimated one-rep max */

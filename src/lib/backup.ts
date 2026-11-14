@@ -8,6 +8,7 @@ export const DATA_KEYS = [
   "unit",
   "onboarded",
   "checklistDismissed",
+  "checkinSeenAt",
   "meals",
   "customFoods",
   "foodLog",

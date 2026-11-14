@@ -65,6 +65,10 @@ Re-run any time from Settings → Set up my plan again.
 **Bottom bar:** Previous workouts · Workout routines · **Today** (pill) · My Foods · **+** (Workout, Food or Habit)
 
 **Menu**
+- Weekly check-in (on Today, once a week; always on the Weight tracker): compares your weight trend
+  (2–3 weigh-ins a week) with the pace you chose. If you've been eating to target and it's off, it
+  suggests a small calorie change (max 250 kcal, never below a safe floor) you can apply in one tap;
+  if you haven't been hitting target, it tells you to do that first.
 - Settings (kg/lb, reminders, backup export/restore, set up my plan again)
 - Reminders (Android notifications, all off by default): breakfast, lunch and dinner at your times —
   skipped if that meal is already logged — and one for habits, only if some are still open that day.
@@ -84,7 +88,12 @@ Re-run any time from Settings → Set up my plan again.
   exercise and shows every time you do it; also on the exercise's ⓘ page.
 - + Add set, + Add exercise (65 preloaded exercises + your own), replace/reorder/remove,
   Settings, Discard workout, Finish (calorie estimate you can edit). Swipe a set left to delete it (Undo).
-- The screen stays on while a workout is open.
+- The screen stays on while a workout is open. Leave the app mid-workout and "Workout in progress"
+  sits in the notification bar; tap it to jump back.
+- Warm-ups: ··· → "Add warm-up sets" builds a ramp to your working weight (bar × 10, ~50% × 8,
+  70% × 5, 85% × 3, in loadable steps). Warm-ups show as "W" and never count towards volume, sets,
+  bests or PRs. Tap a set's number to mark it as a warm-up (or back).
+- Plate calculator: tap a barbell set's number to see the plates for each side of a 20 kg / 45 lb bar.
 - Finishing shows a summary: PRs, duration/volume vs. your last session of this routine, and per exercise
   today's best set against last time ("+2.5 kg", "+1 rep", "First time"). Share sends it as text.
 - New personal records (heaviest weight, best est. 1RM, best set volume, most reps for body-weight moves)
@@ -106,6 +115,9 @@ Re-run any time from Settings → Set up my plan again.
   to a food only when every word fits (Hindi names like chapati/dahi/anda and small typos work);
   otherwise you get "Create <food>" plus "Did you mean…" suggestions.
 - Amounts in servings or grams (switch per item; the amount converts).
+- Voice: tap the mic and say what you ate ("two roti and a bowl of dal"); it fills the text box.
+- Scan: scan a packaged food's barcode. It's looked up on Open Food Facts (needs internet), saved to
+  My Foods, and added as one serving. Scanning the same pack again uses your saved copy.
 - Quick add: just calories (and macros if you know them) for when you can't look a food up.
 - Saved meals show as chips above the text box: one tap logs the whole meal (long-press to delete).
 - ~120 preloaded foods (Indian staples, proteins, dairy, grains, fruit, veg, snacks, drinks); create/edit your own in My Foods.

@@ -76,6 +76,9 @@ export interface AppState {
 
   lastBackupAt?: number;
   markBackedUp: () => void;
+  /** When the weekly check-in was last answered/dismissed on Today */
+  checkinSeenAt?: number;
+  markCheckinSeen: () => void;
   /** Replace all data with a backup's contents. */
   restoreData: (data: Record<string, unknown>) => void;
 
@@ -129,6 +132,9 @@ export interface AppState {
   replaceExercise: (weId: string, exerciseId: string) => void;
   addSet: (weId: string) => void;
   removeSet: (weId: string, setId: string) => void;
+  /** Put warm-up sets (kg) in front of the working sets, replacing any existing warm-ups. */
+  addWarmups: (weId: string, sets: { kg: number; reps: number }[]) => void;
+  setWarmup: (weId: string, setId: string, warmup: boolean) => void;
   updateSet: (weId: string, setId: string, patch: Partial<Pick<WorkoutSet, "kg" | "reps">>) => void;
   /** Toggle a set's done state. Returns the PRs newly earned (empty when un-ticking or none). */
   toggleSet: (weId: string, setId: string, fill?: { kg: number | null; reps: number | null }) => PrKind[];
@@ -303,6 +309,8 @@ export const useApp = create<AppState>()(
       dismissChecklist: () => set({ checklistDismissed: true }),
       lastBackupAt: undefined,
       markBackedUp: () => set({ lastBackupAt: Date.now() }),
+      checkinSeenAt: undefined,
+      markCheckinSeen: () => set({ checkinSeenAt: Date.now() }),
       restoreData: (data) => set({ ...RESTORE_DEFAULTS, ...data, active: (data.active as ActiveWorkout | null | undefined) ?? null, selectedDate: todayKey() }),
       updateProfile: (patch) => set((s) => (s.profile ? { profile: { ...s.profile, ...patch } } : {})),
 
@@ -463,6 +471,31 @@ export const useApp = create<AppState>()(
           ),
         ),
       removeSet: (weId, setId) => set((s) => mapActive(s, (exs) => mapSets(exs, weId, (sets) => sets.filter((x) => x.id !== setId)))),
+      addWarmups: (weId, warm) =>
+        set((s) =>
+          mapActive(s, (exs) =>
+            mapSets(exs, weId, (sets) => [
+              ...warm.map((w) => ({ ...emptySet(), kg: w.kg, reps: w.reps, warmup: true })),
+              ...sets.filter((x) => !x.warmup || x.done),
+            ]),
+          ),
+        ),
+      setWarmup: (weId, setId, warmup) =>
+        set((s) => {
+          const we = s.active?.exercises.find((e) => e.id === weId);
+          return mapActive(s, (exs) =>
+            mapSets(exs, weId, (sets) => {
+              const others = sets.filter((x) => x.id !== setId);
+              const cur = sets.find((x) => x.id === setId);
+              if (!cur) return sets;
+              const next: WorkoutSet = { ...cur, warmup: warmup || undefined };
+              next.pr = next.done && we ? prsFor(s, we, next) : undefined;
+              // warm-ups live at the top: either way the set lands right after the other warm-ups
+              const lead = others.filter((x) => x.warmup).length;
+              return [...others.slice(0, lead), next, ...others.slice(lead)];
+            }),
+          );
+        }),
 
       updateSet: (weId, setId, patch) =>
         set((s) => {
@@ -531,7 +564,7 @@ export const useApp = create<AppState>()(
         if (!w) return null;
         return get().saveRoutine({
           name: w.name,
-          exercises: w.exercises.map((e) => ({ id: uid(), exerciseId: e.exerciseId, sets: e.sets.length })),
+          exercises: w.exercises.map((e) => ({ id: uid(), exerciseId: e.exerciseId, sets: Math.max(1, e.sets.filter((s) => !s.warmup).length) })),
         });
       },
 

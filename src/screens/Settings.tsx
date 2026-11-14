@@ -176,6 +176,17 @@ function RemindersSection() {
             </div>
           );
         })}
+        <div className="flex items-center gap-3 px-4 py-3">
+          <Bell size={18} className={clsx("shrink-0", reminders.workout !== false ? "text-acc" : "text-tx3")} />
+          <div className="min-w-0 flex-1">
+            <Toggle
+              label="Workout in progress"
+              hint="In the notification bar while you're away from the app mid-workout"
+              on={reminders.workout !== false}
+              onChange={(on) => void update({ ...reminders, workout: on }, on)}
+            />
+          </div>
+        </div>
       </Card>
     </>
   );

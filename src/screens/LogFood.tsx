@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Bookmark, ChevronDown, Plus, Search, Sparkles, Trash2, X, Zap } from "lucide-react";
+import { AlertCircle, Bookmark, ChevronDown, Loader2, Mic, Plus, ScanBarcode, Search, Sparkles, Trash2, X, Zap } from "lucide-react";
 import clsx from "clsx";
 import { allFoods, useApp } from "../store/app";
 import { useUi } from "../store/ui";
@@ -12,6 +12,9 @@ import { sumEntries } from "../lib/nutrition";
 import { MealSummary } from "../components/MealSummary";
 import { Button, Confirm, Field, NumberInput, PageHeader, Screen, Sheet, inputCls } from "../components/ui";
 import { AddMealSheet } from "../components/AddMealSheet";
+import { VoiceError, appendSpoken, listen, voiceSupported } from "../lib/voice";
+import { ScanError, lookupBarcode, scanBarcode } from "../lib/barcode";
+import { isNative } from "../lib/platform";
 
 /** Per-item choices the user made, keyed by the item's text so they survive edits to other items. */
 interface Override {
@@ -47,7 +50,61 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
   const dayEntries = useMemo(() => foodLog.filter((e) => e.date === date), [foodLog, date]);
   const [meal, setMeal] = useState<Meal>(initialMeal);
   const [text, setText] = useState("");
+  const [listening, setListening] = useState(false);
+
+  async function speak() {
+    setListening(true);
+    try {
+      const said = await listen();
+      if (said) setText((t) => appendSpoken(t, said));
+      else useUi.getState().showToast("Didn't catch that — try again");
+    } catch (e) {
+      useUi.getState().showToast(e instanceof VoiceError ? e.message : "Voice didn't work");
+    } finally {
+      setListening(false);
+    }
+  }
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
+  const [scanning, setScanning] = useState(false);
+  const [typingCode, setTypingCode] = useState(false);
+
+  /** Scan → find the product (our own foods first, then Open Food Facts) → add "1 <name>" matched to it. */
+  async function scan() {
+    if (!isNative) {
+      setTypingCode(true); // the browser has no scanner: type the digits instead
+      return;
+    }
+    try {
+      const code = await scanBarcode();
+      if (code) await addByBarcode(code);
+    } catch (e) {
+      showToast(e instanceof ScanError ? e.message : "Scanning didn't work");
+    }
+  }
+
+  async function addByBarcode(code: string) {
+    setScanning(true);
+    try {
+      let food = useApp.getState().customFoods.find((f) => f.barcode === code);
+      if (!food) {
+        const found = await lookupBarcode(code);
+        if (!found) {
+          showToast("Not in Open Food Facts — add it as your own food");
+          push({ kind: "foodEditor" });
+          return;
+        }
+        food = useApp.getState().saveCustomFood(found);
+        showToast(`Found ${food.name} — saved to My Foods`);
+      }
+      const segment = `1 ${food.name}`;
+      setOverrides((o) => ({ ...o, [segment.toLowerCase()]: { foodId: food!.id } }));
+      setText((t) => appendSpoken(t, segment));
+    } catch (e) {
+      showToast(e instanceof ScanError ? e.message : "Couldn't look that up");
+    } finally {
+      setScanning(false);
+    }
+  }
   const [changing, setChanging] = useState<Item | null>(null);
   const [addingMeal, setAddingMeal] = useState(false);
   const [quick, setQuick] = useState(false);
@@ -168,6 +225,13 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
           <button onClick={() => setQuick(true)} className="flex shrink-0 items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-sm font-medium text-tx2 active:bg-surf2">
             <Zap size={14} className="text-gold" /> Quick add
           </button>
+          <button
+            onClick={scan}
+            disabled={scanning}
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-sm font-medium text-tx2 active:bg-surf2"
+          >
+            {scanning ? <Loader2 size={14} className="animate-spin text-acc" /> : <ScanBarcode size={14} className="text-acc" />} Scan
+          </button>
           {savedMeals.map((sm) => (
             <button
               key={sm.id}
@@ -190,15 +254,30 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
           <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-tx2">
             <Sparkles size={14} className="text-acc" /> What did you eat?
           </div>
-          <textarea
-            ref={textRef}
-            autoFocus
-            rows={3}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={"2 roti, 1 bowl dal, 150 g paneer, banana"}
-            className="w-full resize-none bg-transparent text-[16px] leading-relaxed text-tx outline-none placeholder:text-tx3"
-          />
+          <div className="flex items-start gap-2">
+            <textarea
+              ref={textRef}
+              autoFocus
+              rows={3}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={"2 roti, 1 bowl dal, 150 g paneer, banana"}
+              className="min-w-0 flex-1 resize-none bg-transparent text-[16px] leading-relaxed text-tx outline-none placeholder:text-tx3"
+            />
+            {voiceSupported() && (
+              <button
+                onClick={speak}
+                disabled={listening}
+                aria-label="Say what you ate"
+                className={clsx(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition",
+                  listening ? "animate-pulse bg-bad text-white" : "bg-acc/15 text-acc active:bg-acc/25",
+                )}
+              >
+                <Mic size={19} />
+              </button>
+            )}
+          </div>
           <div className="text-[11px] text-tx3">Separate foods with commas or "and". Use g for weight (150g paneer) or a number for servings (2 roti).</div>
         </div>
 
@@ -280,6 +359,15 @@ export function LogFood({ meal: initialMeal, date }: { meal: Meal; date: string 
             const it = changing;
             setChanging(null);
             createFor(it);
+          }}
+        />
+      )}
+      {typingCode && (
+        <BarcodeSheet
+          onClose={() => setTypingCode(false)}
+          onSubmit={(code) => {
+            setTypingCode(false);
+            void addByBarcode(code);
           }}
         />
       )}
@@ -657,6 +745,22 @@ function QuickAddSheet({ mealLabel, onClose, onAdd }: { mealLabel: string; onClo
           Add {valid ? `${fmt(calories!)} kcal` : ""}
         </Button>
       </div>
+    </Sheet>
+  );
+}
+
+/** Browser fallback for scanning: type the number under the barcode. */
+function BarcodeSheet({ onClose, onSubmit }: { onClose: () => void; onSubmit: (code: string) => void }) {
+  const [code, setCode] = useState("");
+  const digits = code.replace(/\D/g, "");
+  return (
+    <Sheet open onClose={onClose} title="Barcode">
+      <Field label="Number under the barcode">
+        <input className={inputCls} inputMode="numeric" autoFocus value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. 8901058851427" />
+      </Field>
+      <Button className="mt-4 w-full" disabled={digits.length < 8} onClick={() => onSubmit(digits)}>
+        Look it up
+      </Button>
     </Sheet>
   );
 }
